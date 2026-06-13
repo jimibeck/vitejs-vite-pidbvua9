@@ -352,8 +352,10 @@ export default function App() {
   const [loginName, setLoginName] = useState("");
   const [loginPin, setLoginPin] = useState("");
   const [loginMode, setLoginMode] = useState("login");
+  /*
   const chatEndRef = useRef(null);
   const chatScrollRef = useRef(null);
+  */
 
   /*
   useEffect(() => {
@@ -366,6 +368,52 @@ export default function App() {
   }, [chatMessages]);
 */
 
+const chatEndRef = useRef(null);
+const chatScrollRef = useRef(null);
+const prevChatLenRef = useRef(0);
+const chatInitializedRef = useRef(false);
+const [chatToast, setChatToast] = useState(null);
+
+useEffect(() => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    // 사용자가 맨 아래에서 80px 이내에 있을 때만 자동 스크롤
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const isNearBottom = distanceFromBottom < 80;
+    if (isNearBottom) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [chatMessages]);
+
+  // 새 메시지 도착 시 토스트 표시 (본인이 보낸 메시지는 제외)
+  useEffect(() => {
+    if (!chatInitializedRef.current) {
+      chatInitializedRef.current = true;
+      prevChatLenRef.current = chatMessages.length;
+      return;
+    }
+    const prevLen = prevChatLenRef.current;
+    if (chatMessages.length > prevLen) {
+      const newMsgs = chatMessages.slice(prevLen);
+      const fromOthers = newMsgs.filter((m) => m.name !== currentUser?.name);
+      if (fromOthers.length > 0) {
+        const last = fromOthers[fromOthers.length - 1];
+        const sender = last.system ? null : (last.displayName || last.name);
+        const rawText = last.text || "";
+        const shortText = rawText.length > 40 ? rawText.slice(0, 40) + "..." : rawText;
+        setChatToast({ id: Date.now(), sender, text: shortText });
+      }
+    }
+    prevChatLenRef.current = chatMessages.length;
+  }, [chatMessages, currentUser]);
+
+  // 토스트 자동 닫기
+  useEffect(() => {
+    if (!chatToast) return;
+    const t = setTimeout(() => setChatToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [chatToast]);
+  
   // 초기 로드 + polling
   useEffect(() => {
     const load = async () => {
@@ -972,8 +1020,36 @@ export default function App() {
         fontFamily: "'Pretendard', -apple-system, 'Apple SD Gothic Neo', sans-serif",
         padding: "24px 16px 60px",
       }}
+    /*
     >
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      */
+      >
+      {chatToast && (
+        <div
+          onClick={() => {
+            setChatToast(null);
+            if (chatScrollRef.current) {
+              chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+            }
+          }}
+          style={{
+            position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)",
+            zIndex: 1000, maxWidth: "92%", width: 420,
+            background: "#1F3654", border: `1px solid ${palette.gold}`, borderRadius: 12,
+            padding: "10px 14px", boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+            cursor: "pointer", fontSize: 13, color: palette.text,
+          }}
+        >
+          <span style={{ marginRight: 6 }}>💬</span>
+          {chatToast.sender && (
+            <span style={{ fontWeight: 700, color: palette.gold }}>{chatToast.sender}: </span>
+          )}
+          {chatToast.text}
+        </div>
+      )}
+      <div style={{ maxWidth: 720, margin: "0 auto" }}>
+        
         {/* 타이틀 이미지 */}
         <div style={{ marginBottom: 16, borderRadius: 16, overflow: "hidden", border: `2px solid ${palette.gold}`, boxShadow: `0 0 20px rgba(255,200,87,0.2)` }}>
           <img src={IMG_TITLE} alt="고기팀 진격의 스포츠 토토로" style={{ width: "100%", display: "block" }} />
