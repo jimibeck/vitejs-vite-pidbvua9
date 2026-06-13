@@ -355,6 +355,7 @@ export default function App() {
   const chatEndRef = useRef(null);
   const chatScrollRef = useRef(null);
 
+  /*
   useEffect(() => {
     if (chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
@@ -363,6 +364,7 @@ export default function App() {
       chatEndRef.current.scrollIntoView({ behavior: "auto" });
     }
   }, [chatMessages]);
+*/
 
   // 초기 로드 + polling
   useEffect(() => {
