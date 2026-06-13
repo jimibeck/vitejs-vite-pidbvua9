@@ -401,7 +401,7 @@ useEffect(() => {
         const last = fromOthers[fromOthers.length - 1];
         const sender = last.system ? null : (last.displayName || last.name);
         const rawText = last.text || "";
-        const shortText = rawText.length > 40 ? rawText.slice(0, 40) + "..." : rawText;
+        const shortText = rawText.length > 300 ? rawText.slice(0, 300) + "..." : rawText;
         setChatToast({ id: Date.now(), sender, text: shortText });
       }
     }
