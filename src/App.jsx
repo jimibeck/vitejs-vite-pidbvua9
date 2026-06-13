@@ -1035,6 +1035,7 @@ useEffect(() => {
               chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
             }
           }}
+          /*
           style={{
             position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)",
             zIndex: 1000, maxWidth: "92%", width: 420,
@@ -1042,6 +1043,17 @@ useEffect(() => {
             padding: "10px 14px", boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
             cursor: "pointer", fontSize: 13, color: palette.text,
           }}
+          */
+
+          style={{
+            position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)",
+            zIndex: 1000, maxWidth: "92%", width: 420,
+            background: "#1F3654", border: `1px solid ${palette.gold}`, borderRadius: 12,
+            padding: "10px 14px", boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+            cursor: "pointer", fontSize: 13, color: palette.text,
+            maxHeight: "70vh", overflowY: "auto", wordBreak: "break-word",
+          }}
+          
         >
           <span style={{ marginRight: 6 }}>💬</span>
           {chatToast.sender && (
