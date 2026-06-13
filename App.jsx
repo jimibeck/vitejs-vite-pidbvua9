@@ -384,7 +384,7 @@ export default function App() {
       setLoading(false);
     };
     load();
-    const interval = setInterval(load, 5000);
+    const interval = setInterval(load, 2000);
     return () => clearInterval(interval);
   }, []);
 
