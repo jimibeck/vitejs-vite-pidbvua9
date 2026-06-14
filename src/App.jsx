@@ -449,13 +449,24 @@ useEffect(() => {
     // 자동 스크롤 비활성화 (내가 직접 보낼 때만 스크롤)
   }, [chatMessages]);
 
+  /*
   // 최초 1회 맨 아래로 이동
   useEffect(() => {
     const el = chatScrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, []);
-  
+  */
+
+  // 로그인 후 채팅창 최초 1회 맨 아래로 이동
+  useEffect(() => {
+    if (!currentUser) return;
+    setTimeout(() => {
+      const el = chatScrollRef.current;
+      if (!el) return;
+      el.scrollTop = el.scrollHeight;
+    }, 1000);
+  }, [currentUser]);
 
   // 초기 로드 + polling
   useEffect(() => {
