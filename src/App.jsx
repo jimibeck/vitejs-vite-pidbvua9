@@ -415,6 +415,13 @@ useEffect(() => {
     return () => clearTimeout(t);
   }, [chatToast]);
 
+  // 최초 1회 맨 아래로 이동
+  useEffect(() => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, []);
+
   // 초기 로드 + polling
   useEffect(() => {
     const load = async () => {
