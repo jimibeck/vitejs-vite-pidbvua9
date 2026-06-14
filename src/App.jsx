@@ -927,7 +927,7 @@ useEffect(() => {
           <div style={{ textAlign: "center", marginBottom: 20 }}>
             <div style={{ fontSize: 28, marginBottom: 8 }}>🍗⚽🍗</div>
             <div style={{ fontWeight: 800, fontSize: 18 }}>
-              한국 vs 멕시코 스코어 맞히기
+              성벽사수냐, 함락이냐 - 스코어 예언 대전
             </div>
             <div style={{ color: palette.sub, fontSize: 12, marginTop: 4 }}>
               {loginMode === "register"
