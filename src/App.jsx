@@ -733,7 +733,7 @@ useEffect(() => {
     await pushSystemMessage(`🧹 ${name} 님의 아이디가 관리자에 의해 삭제되었습니다. 재가입 부탁드려요!`);
     setDeleteTarget(null);
   };
-
+/*
   const leaderboard = useMemo(() => {
     const rows = [];
     Object.entries(members).forEach(([idx, entries]) => {
@@ -753,7 +753,44 @@ useEffect(() => {
     });
     return rows.sort((a, b) => b.hours - a.hours || a.prob - b.prob);
   }, [members]);
+*/
 
+const leaderboard = useMemo(() => {
+    const rows = [];
+    Object.entries(members).forEach(([idx, entries]) => {
+      const s = SCORES[Number(idx)];
+      entries.forEach((e) => {
+        const sameScoreCount = entries.length;
+        rows.push({
+          ...e,
+          scoreLabel: s.home === "5+"
+            ? (s.away === "KOR" ? "한국 5점차 이상 대승" : "한국 5점차 이상 대패")
+            : `${s.away}:${s.home}`,
+          prob: s.prob,
+          hours: s.hours,
+          perPersonHours: (s.hours / sameScoreCount).toFixed(1),
+        });
+      });
+    });
+    const sorted = rows.sort((a, b) => b.hours - a.hours || a.prob - b.prob);
+
+    // 단장(히딩크)은 항상 맨 마지막에 고정
+    const masterEntry = roster.find((r) => r.title === MASTER_TITLE);
+    if (masterEntry) {
+      sorted.push({
+        name: masterEntry.name,
+        displayName: masterEntry.displayName,
+        img: masterEntry.img,
+        scoreLabel: "아무도 못 맞춘다 😈",
+        prob: 0.99,
+        hours: 0,
+        perPersonHours: "0",
+        isMaster: true,
+      });
+    }
+    return sorted;
+  }, [members, roster]);
+  
   const squadAverages = useMemo(() => {
     const memberSquad = {};
     roster.forEach((r) => {
@@ -1277,9 +1314,15 @@ useEffect(() => {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  
+                  
+                
+
                   <span style={{ color: palette.gold, fontWeight: 700, width: 24 }}>
-                    {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`}
+                    {row.isMaster ? "👑" : i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`}
                   </span>
+
+                  
                   <Avatar src={row.img} size={26} ring={row.name === currentUser.name ? palette.gold : undefined} />
                   <span style={{ fontWeight: row.name === currentUser.name ? 700 : 400, color: row.name === currentUser.name ? palette.gold : palette.text }}>
                     {row.displayName}
