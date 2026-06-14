@@ -633,6 +633,7 @@ useEffect(() => {
     }
   };
 
+  /*
   const sendChat = async () => {
     const text = chatInput.trim();
     if (!text) return;
@@ -653,6 +654,32 @@ useEffect(() => {
       setError("채팅 전송에 실패했어요.");
     }
   };
+  */
+
+  const sendChat = async () => {
+  const text = chatInput.trim();
+  if (!text) return;
+  const newMsg = {
+    name: currentUser.name,
+    displayName: currentUser.displayName,
+    img: currentUser.img,
+    text,
+    ts: Date.now(),
+  };
+  let updated = [...chatMessages, newMsg];
+  if (updated.length > 500) updated = updated.slice(updated.length - 500);
+  setChatMessages(updated);
+  setChatInput("");
+  setTimeout(() => {
+    const el = chatScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, 50);
+  try {
+    await dbStorage.set("chat", JSON.stringify(updated));
+  } catch (e) {
+    setError("채팅 전송에 실패했어요.");
+  }
+};
 
   const removeEntry = (scoreIdx, name) => {
     if (isBettingClosed()) return;
