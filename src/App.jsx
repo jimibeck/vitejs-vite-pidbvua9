@@ -925,7 +925,7 @@ useEffect(() => {
           }}
         >
           <div style={{ textAlign: "center", marginBottom: 20 }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>🍗⚽🍗</div>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>⚔️ 🧱 🏹 🧱 🍗 🧱 ⚽ 🦧 🗿 🧟</div>
             <div style={{ fontWeight: 800, fontSize: 18 }}>
               성벽사수냐, 함락이냐 - 스코어 예언 대전
             </div>
