@@ -389,13 +389,13 @@ useEffect(() => {
   }, [chatMessages]);
 
   */
-
+/*
   useEffect(() => {
     const el = chatScrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [chatMessages]);
-
+*/
   // 새 메시지 도착 시 토스트 표시 (본인이 보낸 메시지는 제외)
   useEffect(() => {
     if (!chatInitializedRef.current) {
