@@ -787,7 +787,7 @@ const leaderboard = useMemo(() => {
         displayName: masterEntry.displayName,
         img: masterEntry.img,
         scoreLabel: "아무도 못 맞춘다 😈",
-        prob: 0.99,
+        prob: 0.999,
         hours: 0,
         perPersonHours: "0",
         isMaster: true,
