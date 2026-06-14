@@ -61,10 +61,10 @@ const PLAYER_TITLES = [
   { title: "회식비 N 분의 1 철벽치는 260억 김민재", img: IMG_KIMMINJAE },
   { title: "헤더하다 회의 알림에 흔들린 이한범", img: IMG_LEEHANBEOM },
   { title: "크로스 올리고 보고서 마감 뛰는 이태석", img: IMG_LEETAESEOK },
-  { title: "바르셀로나 티키타카 스타일로 기습 칼퇴 백승호", img: IMG_BAEKSEUNGHO },
+  { title: "바르셀로나 티키타카 스타일 칼퇴요정 백승호", img: IMG_BAEKSEUNGHO },
   { title: "동점골 넣고 연차 승인받은 황인범", img: IMG_HWANGINBEOM },
   { title: "측면 폭격수인데 야근도 폭풍흡입 설영우", img: IMG_SEOLYEONGWOO },
-  { title: "황희찬 인수인계 후 모드김치 찌개 먹으러 간 이재성", img: IMG_LEEJAESUNG },
+  { title: "황희찬 업무인계에 신난 모드김치 이재성", img: IMG_LEEJAESUNG },
   { title: "택배기사인데 자료도 배달 가능 이강인", img: IMG_LEEKANGIN },
   { title: "퇴사 안 하는 만년 캡틴 쏜쏜", img: IMG_SONHEUNGMIN },
 ];
