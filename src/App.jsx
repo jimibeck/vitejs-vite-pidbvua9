@@ -830,8 +830,12 @@ useEffect(() => {
       ...r,
       winProb: totalRaw > 0 ? r._raw / totalRaw : 0,
     }));
-
+/*
     const ranked = [...normalized].sort((a, b) => b.winProb - a.winProb);
+*/
+    const ranked = [...normalized].sort((a, b) => a.winProb - b.winProb);
+
+    
     const rankMap = {};
     ranked.forEach((r, i) => { rankMap[r.squad] = i + 1; });
 
