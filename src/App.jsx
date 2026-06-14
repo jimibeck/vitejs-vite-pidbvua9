@@ -425,12 +425,25 @@ useEffect(() => {
     return () => clearTimeout(t);
   }, [chatToast]);
 
+  /*
   // 최초 1회 맨 아래로 이동
   useEffect(() => {
     const el = chatScrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, []);
+  */
+
+useEffect(() => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const isNearBottom = distanceFromBottom < 80;
+    if (isNearBottom) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [chatMessages]);
+  
 
   // 초기 로드 + polling
   useEffect(() => {
