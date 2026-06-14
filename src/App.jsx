@@ -411,7 +411,7 @@ useEffect(() => {
   // 토스트 자동 닫기
   useEffect(() => {
     if (!chatToast) return;
-    const t = setTimeout(() => setChatToast(null), 9000);
+    const t = setTimeout(() => setChatToast(null), 5000);
     return () => clearTimeout(t);
   }, [chatToast]);
 
