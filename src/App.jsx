@@ -1289,8 +1289,11 @@ useEffect(() => {
             <span style={{ fontSize: 11 }}>(벽을 넘어 바다로, 낮은 확률의 도파민 중독에 빠진 스쿼드)</span>
           </div>
           <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
-            {[...squadAverages].sort((a, b) => a.winProb - b.winProb).map((row) => (
-              <div
+           
+           
+          {[...squadAverages].sort((a, b) => a.rank - b.rank).map((row) => (
+          
+          <div
                 key={row.squad}
                 style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
