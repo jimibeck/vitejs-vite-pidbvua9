@@ -433,7 +433,7 @@ useEffect(() => {
     el.scrollTop = el.scrollHeight;
   }, []);
   */
-
+/*
 useEffect(() => {
     const el = chatScrollRef.current;
     if (!el) return;
@@ -442,6 +442,11 @@ useEffect(() => {
     if (isNearBottom) {
       el.scrollTop = el.scrollHeight;
     }
+  }, [chatMessages]);
+ */
+
+useEffect(() => {
+    // 자동 스크롤 비활성화 (내가 직접 보낼 때만 스크롤)
   }, [chatMessages]);
   
 
