@@ -61,7 +61,7 @@ const IMG_SUBONG_SSR = "data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSU
 // ───────────────────────────────────────────────
 // 칭호
 // ───────────────────────────────────────────────
-const MASTER_TITLE = "🎬 우리가 모든 것을 엎어! 원타임 TEDDY";
+const MASTER_TITLE = "🎬 더고기레이블 대표! 원타임 테디";
 const MASTER_NAME = "전진우";
 const SSR_BOOSTER_NAME = "김수봉";
 const SSR_BOOST_HOURS = 1;
