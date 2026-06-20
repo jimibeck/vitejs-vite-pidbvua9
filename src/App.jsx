@@ -1640,7 +1640,7 @@ export default function App() {
               maxWidth: "100%",
             }}
           >
-            <Avatar src={currentUser.img} size={28} ring={palette.gold} />
+            <Avatar src={currentUser.img} size={40} ring={palette.gold} />
 
             <span style={{ textAlign: "left", lineHeight: 1.3 }}>
               {currentUser.title}
@@ -1815,27 +1815,30 @@ export default function App() {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  gap: 12,
+                  gap: 10,
                   background: row.isSSR ? "linear-gradient(90deg, rgba(255,200,87,0.30), rgba(255,200,87,0.06), #0E1A2B)" : i === 0 ? "linear-gradient(90deg, rgba(255,200,87,0.20), #0E1A2B)" : i === 1 ? "linear-gradient(90deg, rgba(180,190,210,0.16), #0E1A2B)" : i === 2 ? "linear-gradient(90deg, rgba(205,127,50,0.16), #0E1A2B)" : "#0E1A2B",
                   borderRadius: 10,
                   border: row.isSSR ? `1px solid ${palette.gold}` : i <= 2 ? `1px solid ${i === 0 ? palette.gold : "#31476B"}` : "1px solid transparent",
-                  padding: "8px 12px",
+                  padding: "10px 12px",
                   fontSize: 13,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
                   <span style={{ color: palette.gold, fontWeight: 700, width: 24, flexShrink: 0 }}>
                     {row.isMaster ? "👑" : i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`}
                   </span>
 
-                  <Avatar src={row.img} size={26} ring={row.isSSR || row.name === currentUser.name ? palette.gold : undefined} />
+                  <Avatar src={row.img} size={36} ring={row.isSSR || row.name === currentUser.name ? palette.gold : undefined} />
 
                   <span
+                    title={row.displayName}
                     style={{
                       fontWeight: row.name === currentUser.name ? 700 : 400,
                       color: row.name === currentUser.name ? palette.gold : palette.text,
-                      whiteSpace: "normal",
-                      overflowWrap: "anywhere",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      minWidth: 0,
                     }}
                   >
                     {row.isSSR && <span style={{ color: palette.gold, marginRight: 4 }}>👑 SSR</span>}
@@ -1843,9 +1846,11 @@ export default function App() {
                   </span>
                 </div>
 
-                <div style={{ textAlign: "right", color: palette.sub, flexShrink: 0 }}>
-                  <div>{row.scoreLabel} ({(row.prob * 100).toFixed(1)}%)</div>
-                  <div style={{ color: row.isClickGameTie && !row.isClickGameWinner ? palette.sub : palette.gold, fontWeight: 700 }}>
+                <div style={{ textAlign: "right", color: palette.sub, flexShrink: 0, width: 110 }}>
+                  <div style={{ whiteSpace: "nowrap", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {row.scoreLabel} ({(row.prob * 100).toFixed(1)}%)
+                  </div>
+                  <div style={{ color: row.isClickGameTie && !row.isClickGameWinner ? palette.sub : palette.gold, fontWeight: 700, whiteSpace: "nowrap" }}>
                     {row.perPersonHours}h
                     {row.ssrBonus > 0 && (
                       <span style={{ fontSize: 10, marginLeft: 4, color: palette.gold }}>+SSR {row.ssrBonus}h</span>
@@ -1999,20 +2004,20 @@ export default function App() {
                     style={{
                       background: isSelected ? "#1F3654" : palette.card,
                       border: isSelected ? `2px solid ${palette.gold}` : `1px solid #24395C`,
-                      borderRadius: 14,
-                      padding: "14px 16px",
+                      borderRadius: 16,
+                      padding: "18px 20px",
                       cursor: locked ? "default" : "pointer",
                       transition: "all 0.15s",
                       opacity: locked && !isSelected ? 0.6 : 1,
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: 16 }}>
+                        <div style={{ fontWeight: 700, fontSize: 18 }}>
                           {s.emoji} {s.label}
                         </div>
 
-                        <div style={{ fontSize: 11, color: palette.sub, marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: palette.sub, marginTop: 3 }}>
                           예상 확률 약 {(s.prob * 100).toFixed(1)}% {s.source === "real" ? "(실제 배당 기반)" : "(추정)"}
                         </div>
                       </div>
@@ -2021,8 +2026,8 @@ export default function App() {
                         style={{
                           background: "#0E1A2B",
                           borderRadius: 999,
-                          padding: "6px 14px",
-                          fontSize: 13,
+                          padding: "8px 16px",
+                          fontSize: 14,
                           fontWeight: 700,
                           color: palette.gold,
                           whiteSpace: "nowrap",
@@ -2034,7 +2039,7 @@ export default function App() {
                     </div>
 
                     {entries.length > 0 && (
-                      <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
                         {entries.map((e) => {
                           const isMe = e.name === currentUser.name;
                           const myScore = clickGameScores[`${idx}_${e.name}`];
@@ -2047,23 +2052,23 @@ export default function App() {
                                 border: `1px solid ${isMe ? palette.gold : palette.accent2}`,
                                 color: isMe ? palette.gold : palette.accent2,
                                 borderRadius: 999,
-                                padding: "4px 10px 4px 4px",
-                                fontSize: 12,
+                                padding: "5px 14px 5px 5px",
+                                fontSize: 13,
                                 display: "flex",
                                 alignItems: "center",
-                                gap: 6,
+                                gap: 8,
                                 fontWeight: isMe ? 700 : 400,
                                 maxWidth: "100%",
                               }}
                             >
-                              <Avatar src={e.img} size={22} ring={isMe ? palette.gold : palette.accent2} />
+                              <Avatar src={e.img} size={32} ring={isMe ? palette.gold : palette.accent2} />
                               <span style={{ whiteSpace: "normal", overflowWrap: "anywhere" }}>
                                 {isMe ? "⭐ " : ""}
                                 {e.displayName || e.name}
                               </span>
 
                               {myScore != null && (
-                                <span style={{ fontSize: 10, color: palette.gold, flexShrink: 0 }}>
+                                <span style={{ fontSize: 11, color: palette.gold, flexShrink: 0 }}>
                                   🖱️{myScore}
                                 </span>
                               )}
