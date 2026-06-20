@@ -438,6 +438,7 @@ export default function App() {
   const [selected, setSelected] = useState(null);
   const [error, setError] = useState("");
   const [welcomeUser, setWelcomeUser] = useState(null);
+  const [gachaUser, setGachaUser] = useState(null);
 
   const [currentUser, setCurrentUser] = useState(null);
   const [loginName, setLoginName] = useState("");
@@ -676,6 +677,7 @@ export default function App() {
 
       await pushSystemMessage(`🎉 ${newUser.displayName} 님의 아이디가 생성되었습니다!`);
       setWelcomeUser(newUser);
+      setGachaUser(newUser);
     } else {
       const pin = loginPin.trim();
 
@@ -1576,7 +1578,253 @@ export default function App() {
           0%, 100% { box-shadow: 0 0 18px rgba(168,85,247,0.42), 0 0 32px rgba(236,72,153,0.18); }
           50% { box-shadow: 0 0 28px rgba(168,85,247,0.78), 0 0 52px rgba(236,72,153,0.34); }
         }
+
+        @keyframes gachaFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes gachaCardReveal {
+          0% { transform: perspective(900px) rotateY(180deg) scale(0.72); opacity: 0; filter: blur(6px); }
+          30% { transform: perspective(900px) rotateY(110deg) scale(0.92); opacity: 1; filter: blur(2px); }
+          55% { transform: perspective(900px) rotateY(28deg) scale(1.06); filter: blur(0); }
+          72% { transform: perspective(900px) rotateY(-8deg) scale(1.02); }
+          100% { transform: perspective(900px) rotateY(0deg) scale(1); opacity: 1; filter: blur(0); }
+        }
+        @keyframes gachaShake {
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+          20%, 40%, 60%, 80% { transform: translateX(3px); }
+        }
+        @keyframes gachaLightning {
+          0%, 100% { opacity: 0; transform: scale(0.82) rotate(-8deg); }
+          18% { opacity: 1; transform: scale(1.12) rotate(4deg); }
+          34% { opacity: 0.25; transform: scale(0.94) rotate(-4deg); }
+          50% { opacity: 1; transform: scale(1.18) rotate(8deg); }
+          70% { opacity: 0; transform: scale(1.32) rotate(0deg); }
+        }
+        @keyframes gachaGoldGlow {
+          0%, 100% { box-shadow: 0 0 28px rgba(255,200,87,0.55), 0 0 64px rgba(255,200,87,0.24); }
+          50% { box-shadow: 0 0 42px rgba(255,200,87,0.92), 0 0 92px rgba(255,200,87,0.36); }
+        }
+        @keyframes gachaPurpleGlow {
+          0%, 100% { box-shadow: 0 0 34px rgba(168,85,247,0.72), 0 0 74px rgba(236,72,153,0.32); }
+          50% { box-shadow: 0 0 56px rgba(168,85,247,1), 0 0 118px rgba(236,72,153,0.56); }
+        }
+        @keyframes gachaBurst {
+          0% { opacity: 0; transform: scale(0.5) rotate(0deg); }
+          35% { opacity: 1; transform: scale(1.08) rotate(8deg); }
+          100% { opacity: 0; transform: scale(1.55) rotate(18deg); }
+        }
+        @keyframes gachaFloat {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-6px); }
+        }
       `}</style>
+
+
+      {gachaUser && (() => {
+        const isSSR = gachaUser.name === SSR_BOOSTER_NAME;
+        const aura = isSSR ? "#A855F7" : palette.gold;
+        const avatarSize = isSSR ? 210 : 176;
+
+        return (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 5000,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 18,
+              background: isSSR
+                ? "radial-gradient(circle at 50% 32%, rgba(168,85,247,0.45), rgba(236,72,153,0.18) 34%, rgba(2,6,23,0.96) 76%)"
+                : "radial-gradient(circle at 50% 32%, rgba(255,200,87,0.38), rgba(245,158,11,0.15) 34%, rgba(2,6,23,0.94) 76%)",
+              animation: "gachaFadeIn 260ms ease both",
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                pointerEvents: "none",
+                backgroundImage: isSSR
+                  ? "radial-gradient(circle, rgba(216,180,254,0.55) 0 2px, transparent 3px), radial-gradient(circle, rgba(236,72,153,0.32) 0 1px, transparent 2px)"
+                  : "radial-gradient(circle, rgba(255,239,184,0.55) 0 2px, transparent 3px), radial-gradient(circle, rgba(255,200,87,0.32) 0 1px, transparent 2px)",
+                backgroundSize: "46px 46px, 72px 72px",
+                opacity: 0.35,
+              }}
+            />
+
+            <div
+              style={{
+                position: "absolute",
+                top: "16%",
+                left: "50%",
+                transform: "translateX(-50%)",
+                fontSize: isSSR ? 70 : 54,
+                color: isSSR ? "#E9D5FF" : "#FFE9A6",
+                textShadow: isSSR ? "0 0 28px #A855F7" : "0 0 24px #FFC857",
+                animation: "gachaLightning 1.15s ease-in-out 2",
+                pointerEvents: "none",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {isSSR ? "⚡⚡⚡⚡⚡" : "⚡⚡⚡"}
+            </div>
+
+            {isSSR && (
+              <div
+                style={{
+                  position: "absolute",
+                  width: 340,
+                  height: 340,
+                  borderRadius: "50%",
+                  border: "2px solid rgba(216,180,254,0.55)",
+                  animation: "gachaBurst 1.8s ease-out 0.65s infinite",
+                  pointerEvents: "none",
+                }}
+              />
+            )}
+
+            <div
+              style={{
+                position: "relative",
+                width: "min(94vw, 430px)",
+                borderRadius: 28,
+                padding: isSSR ? "24px 18px 20px" : "22px 18px 18px",
+                textAlign: "center",
+                color: palette.text,
+                border: isSSR ? "2px solid rgba(168,85,247,0.95)" : `2px solid ${palette.gold}`,
+                background: isSSR
+                  ? "linear-gradient(180deg, rgba(88,28,135,0.98), rgba(17,24,39,0.98) 48%, rgba(24,14,42,0.98))"
+                  : "linear-gradient(180deg, rgba(120,78,20,0.98), rgba(17,24,39,0.98) 48%, rgba(38,29,13,0.98))",
+                boxShadow: isSSR
+                  ? "0 0 48px rgba(168,85,247,0.85), 0 0 110px rgba(236,72,153,0.42)"
+                  : "0 0 42px rgba(255,200,87,0.78), 0 0 90px rgba(255,200,87,0.30)",
+                animation: `${isSSR ? "gachaPurpleGlow" : "gachaGoldGlow"} 1.6s ease-in-out infinite, gachaCardReveal 1.35s cubic-bezier(.2,.9,.2,1) both, gachaShake 520ms ease-in-out 360ms 1`,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background: isSSR
+                    ? "linear-gradient(135deg, rgba(216,180,254,0.22), transparent 38%, rgba(236,72,153,0.18))"
+                    : "linear-gradient(135deg, rgba(255,239,184,0.22), transparent 38%, rgba(255,200,87,0.18))",
+                  pointerEvents: "none",
+                }}
+              />
+
+              <div style={{ position: "relative", zIndex: 1 }}>
+                <div
+                  style={{
+                    fontSize: isSSR ? 28 : 23,
+                    fontWeight: 1000,
+                    letterSpacing: isSSR ? 1.2 : 0.8,
+                    color: isSSR ? "#F3E8FF" : "#FFF4C2",
+                    textShadow: isSSR ? "0 0 16px rgba(168,85,247,0.95)" : "0 0 14px rgba(255,200,87,0.85)",
+                    marginBottom: 6,
+                  }}
+                >
+                  {isSSR ? "✨ SPECIAL MEMBER ✨" : "⭐⭐⭐⭐"}
+                </div>
+
+                {!isSSR && (
+                  <div
+                    style={{
+                      color: "#FFE9A6",
+                      fontSize: 18,
+                      fontWeight: 1000,
+                      letterSpacing: 1.6,
+                      marginBottom: 10,
+                    }}
+                  >
+                    SPECIAL MEMBER
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    fontSize: isSSR ? 19 : 17,
+                    fontWeight: 900,
+                    lineHeight: 1.35,
+                    marginBottom: 16,
+                    wordBreak: "keep-all",
+                    overflowWrap: "anywhere",
+                    padding: "0 8px",
+                  }}
+                >
+                  🎤 {gachaUser.title}
+                </div>
+
+                <div
+                  style={{
+                    display: "inline-flex",
+                    padding: isSSR ? 8 : 7,
+                    borderRadius: "50%",
+                    background: isSSR ? "rgba(168,85,247,0.18)" : "rgba(255,200,87,0.16)",
+                    border: `2px solid ${aura}`,
+                    animation: "gachaFloat 2s ease-in-out infinite",
+                  }}
+                >
+                  <Avatar src={gachaUser.img} size={avatarSize} ring={aura} />
+                </div>
+
+                {isSSR ? (
+                  <>
+                    <div style={{ marginTop: 15, fontSize: 24, fontWeight: 1000, color: "#E9D5FF" }}>
+                      ⭐⭐⭐⭐⭐ SSR
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 8,
+                        display: "inline-block",
+                        padding: "8px 14px",
+                        borderRadius: 999,
+                        background: "rgba(168,85,247,0.22)",
+                        border: "1px solid rgba(216,180,254,0.72)",
+                        color: "#F3E8FF",
+                        fontSize: 13,
+                        fontWeight: 1000,
+                        letterSpacing: 1,
+                      }}
+                    >
+                      SPECIAL BOOSTER +1H
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ marginTop: 14, fontSize: 13, color: "#FFE9A6", fontWeight: 900 }}>
+                    GOLD MEMBER CARD
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setGachaUser(null)}
+                  style={{
+                    marginTop: 18,
+                    width: "100%",
+                    border: "none",
+                    borderRadius: 999,
+                    padding: "13px 16px",
+                    background: isSSR
+                      ? "linear-gradient(90deg, #A855F7, #EC4899)"
+                      : "linear-gradient(90deg, #F59E0B, #FFC857)",
+                    color: isSSR ? "#fff" : "#111827",
+                    fontWeight: 1000,
+                    fontSize: 15,
+                    cursor: "pointer",
+                    boxShadow: isSSR ? "0 8px 22px rgba(168,85,247,0.35)" : "0 8px 22px rgba(255,200,87,0.25)",
+                  }}
+                >
+                  {isSSR ? "👑 확인" : "확인"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {chatToast && (
         <div
