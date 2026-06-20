@@ -1558,6 +1558,26 @@ export default function App() {
         padding: "24px 16px 60px",
       }}
     >
+      <style>{`
+        @keyframes leaderboardRise {
+          from { opacity: 0; transform: translateY(18px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes medalBounce {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          50% { transform: translateY(-4px) rotate(-3deg); }
+        }
+        @keyframes crownWiggle {
+          0%, 100% { transform: rotate(0deg) scale(1); }
+          25% { transform: rotate(-8deg) scale(1.08); }
+          75% { transform: rotate(8deg) scale(1.08); }
+        }
+        @keyframes ssrAuraPulse {
+          0%, 100% { box-shadow: 0 0 18px rgba(168,85,247,0.42), 0 0 32px rgba(236,72,153,0.18); }
+          50% { box-shadow: 0 0 28px rgba(168,85,247,0.78), 0 0 52px rgba(236,72,153,0.34); }
+        }
+      `}</style>
+
       {chatToast && (
         <div
           onClick={() => {
@@ -1633,38 +1653,53 @@ export default function App() {
               marginTop: 10,
               display: "inline-flex",
               alignItems: "center",
-              flexWrap: "wrap",
               gap: 10,
               background: palette.card,
-              borderRadius: 999,
-              padding: "6px 14px",
+              borderRadius: 18,
+              padding: "8px 12px",
               fontSize: 13,
               border: `1px solid #24395C`,
               maxWidth: "100%",
+              boxSizing: "border-box",
             }}
           >
-            <Avatar src={currentUser.img} size={40} ring={palette.gold} />
+            <Avatar src={currentUser.img} size={42} ring={palette.gold} />
 
-            <span style={{ textAlign: "left", lineHeight: 1.3 }}>
-              {currentUser.title}
-              <br />
-              ({currentUser.name})
-            </span>
+            <div style={{ minWidth: 0, textAlign: "left", lineHeight: 1.3 }}>
+              <div
+                style={{
+                  fontWeight: 800,
+                  overflowWrap: "anywhere",
+                  wordBreak: "keep-all",
+                }}
+              >
+                {currentUser.title}
+              </div>
 
-            <span
-              onClick={handleLogout}
-              style={{
-                color: palette.sub,
-                cursor: "pointer",
-                textAlign: "center",
-                lineHeight: 1.3,
-                flexShrink: 0,
-              }}
-            >
-              숙소로
-              <br />
-              돌아가기
-            </span>
+              <div style={{ color: palette.sub, fontSize: 12, marginTop: 2 }}>
+                ({currentUser.name})
+              </div>
+
+              <button
+                onClick={handleLogout}
+                style={{
+                  marginTop: 7,
+                  width: "100%",
+                  border: `1px solid #31476B`,
+                  background: "#0E1A2B",
+                  color: palette.sub,
+                  borderRadius: 999,
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  lineHeight: 1,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                🏠 숙소로 돌아가기
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1813,8 +1848,19 @@ export default function App() {
 
             {leaderboard.map((row, i) => {
               const isTop = i === 0;
-              const avatarSize = isTop ? 184 : 136;
-              const rankLabel = row.isMaster ? "👑" : i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}등`;
+              const isPodium = i <= 2;
+              const avatarSize = isTop ? 190 : 146;
+              const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}등`;
+              const rankLabel = row.isMaster ? "👑" : medal;
+              const cardBorder = row.isSSR
+                ? "1px solid rgba(168,85,247,0.95)"
+                : i === 0
+                  ? `2px solid ${palette.gold}`
+                  : i === 1
+                    ? "1px solid rgba(180,190,210,0.7)"
+                    : i === 2
+                      ? "1px solid rgba(205,127,50,0.7)"
+                      : "1px solid transparent";
 
               return (
                 <div
@@ -1825,37 +1871,103 @@ export default function App() {
                     flexDirection: "column",
                     alignItems: "center",
                     gap: isTop ? 12 : 9,
-                    background: row.isSSR ? "linear-gradient(180deg, rgba(255,200,87,0.34), rgba(255,200,87,0.09), #0E1A2B)" : i === 0 ? "linear-gradient(180deg, rgba(255,200,87,0.24), #0E1A2B)" : i === 1 ? "linear-gradient(180deg, rgba(180,190,210,0.18), #0E1A2B)" : i === 2 ? "linear-gradient(180deg, rgba(205,127,50,0.18), #0E1A2B)" : "#0E1A2B",
-                    borderRadius: isTop ? 18 : 16,
-                    border: row.isSSR ? `1px solid ${palette.gold}` : i <= 2 ? `1px solid ${i === 0 ? palette.gold : "#31476B"}` : "1px solid transparent",
-                    padding: isTop ? "16px 14px" : "13px 12px",
+                    background: row.isSSR
+                      ? "radial-gradient(circle at 50% 34%, rgba(168,85,247,0.38), rgba(236,72,153,0.16) 42%, #0E1A2B 86%)"
+                      : i === 0
+                        ? "linear-gradient(180deg, rgba(255,200,87,0.30), rgba(255,200,87,0.10), #0E1A2B)"
+                        : i === 1
+                          ? "linear-gradient(180deg, rgba(180,190,210,0.20), #0E1A2B)"
+                          : i === 2
+                            ? "linear-gradient(180deg, rgba(205,127,50,0.20), #0E1A2B)"
+                            : "#0E1A2B",
+                    borderRadius: isTop ? 20 : 17,
+                    border: cardBorder,
+                    padding: isTop ? "18px 14px" : "14px 12px",
                     fontSize: 13,
                     overflow: "hidden",
-                    boxShadow: isTop ? "0 12px 30px rgba(0,0,0,0.32)" : "none",
+                    boxShadow: row.isSSR
+                      ? "0 0 24px rgba(168,85,247,0.58), 0 0 46px rgba(236,72,153,0.20)"
+                      : isTop
+                        ? "0 0 0 1px rgba(255,200,87,0.20), 0 14px 34px rgba(0,0,0,0.38), 0 0 26px rgba(255,200,87,0.22)"
+                        : "none",
+                    animation: `${row.isSSR ? "ssrAuraPulse 2.2s ease-in-out infinite, " : ""}leaderboardRise 420ms ease both`,
+                    animationDelay: `${i * 70}ms`,
                   }}
                 >
+                  {isTop && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 8,
+                        right: 10,
+                        fontSize: 28,
+                        animation: "crownWiggle 1.8s ease-in-out infinite",
+                        filter: "drop-shadow(0 2px 6px rgba(255,200,87,0.45))",
+                      }}
+                    >
+                      👑
+                    </div>
+                  )}
+
+                  {row.isSSR && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        pointerEvents: "none",
+                        background: "linear-gradient(135deg, rgba(168,85,247,0.15), transparent 44%, rgba(236,72,153,0.12))",
+                      }}
+                    />
+                  )}
+
                   <div
                     title={row.displayName}
                     style={{
+                      position: "relative",
+                      zIndex: 1,
                       width: "100%",
                       textAlign: "center",
                       fontWeight: row.name === currentUser.name || isTop ? 900 : 800,
-                      color: row.name === currentUser.name || row.isSSR || isTop ? palette.gold : palette.text,
+                      color: row.isSSR ? "#E9D5FF" : row.name === currentUser.name || isTop ? palette.gold : palette.text,
                       lineHeight: 1.35,
                       fontSize: isTop ? 17 : 14,
                       wordBreak: "keep-all",
                       overflowWrap: "anywhere",
-                      padding: "0 4px",
+                      padding: isTop ? "0 34px" : "0 4px",
                       boxSizing: "border-box",
                     }}
                   >
-                    <span style={{ marginRight: 6 }}>{rankLabel}</span>
-                    {row.isSSR && <span style={{ color: palette.gold, marginRight: 5 }}>👑 SSR</span>}
+                    <span
+                      style={{
+                        display: "inline-block",
+                        marginRight: 6,
+                        animation: isPodium ? "medalBounce 1.7s ease-in-out infinite" : "none",
+                      }}
+                    >
+                      {rankLabel}
+                    </span>
+                    {row.isSSR && <span style={{ color: "#C084FC", marginRight: 5 }}>✨ SSR</span>}
                     {row.displayName}
                   </div>
 
-                  <div style={{ position: "relative", width: avatarSize, height: avatarSize, flexShrink: 0 }}>
-                    <Avatar src={row.img} size={avatarSize} ring={row.isSSR || row.name === currentUser.name || isTop ? palette.gold : undefined} />
+                  {row.isSSR && (
+                    <div
+                      style={{
+                        position: "relative",
+                        zIndex: 1,
+                        marginTop: -4,
+                        color: "#C084FC",
+                        fontSize: 11,
+                        fontWeight: 900,
+                        letterSpacing: 1.5,
+                      }}
+                    >
+                      SPECIAL BOOSTER +1H
+                    </div>
+                  )}
+
+                  <div style={{ position: "relative", zIndex: 1, width: avatarSize, height: avatarSize, flexShrink: 0 }}>
+                    <Avatar src={row.img} size={avatarSize} ring={row.isSSR ? "#A855F7" : row.name === currentUser.name || isTop ? palette.gold : undefined} />
                     {row.isClickGameTie && (
                       <span
                         style={{
@@ -1884,6 +1996,8 @@ export default function App() {
 
                   <div
                     style={{
+                      position: "relative",
+                      zIndex: 1,
                       width: "100%",
                       display: "flex",
                       flexDirection: isTop ? "column" : "row",
@@ -1896,8 +2010,8 @@ export default function App() {
                     <div
                       style={{
                         color: palette.text,
-                        fontWeight: 800,
-                        fontSize: isTop ? 18 : 14,
+                        fontWeight: 900,
+                        fontSize: isTop ? 19 : 15,
                         lineHeight: 1.2,
                         overflowWrap: "anywhere",
                       }}
@@ -1908,9 +2022,9 @@ export default function App() {
 
                     <div
                       style={{
-                        color: row.isClickGameTie && !row.isClickGameWinner ? palette.sub : palette.gold,
+                        color: row.isSSR ? "#C084FC" : row.isClickGameTie && !row.isClickGameWinner ? palette.sub : palette.gold,
                         fontWeight: 900,
-                        fontSize: isTop ? 24 : 18,
+                        fontSize: isTop ? 25 : 18,
                         lineHeight: 1.1,
                         whiteSpace: "nowrap",
                       }}
@@ -1926,9 +2040,9 @@ export default function App() {
                   </div>
 
                   {(row.ssrBonus > 0 || row.isClickGameTie) && (
-                    <div style={{ minHeight: 16, textAlign: "center", lineHeight: 1.25 }}>
+                    <div style={{ position: "relative", zIndex: 1, minHeight: 16, textAlign: "center", lineHeight: 1.25 }}>
                       {row.ssrBonus > 0 && (
-                        <span style={{ fontSize: 11, color: palette.gold, fontWeight: 800 }}>SSR 적중 +{row.ssrBonus}h</span>
+                        <span style={{ fontSize: 11, color: "#C084FC", fontWeight: 900 }}>✨ SSR 적중 +{row.ssrBonus}h</span>
                       )}
                       {row.isClickGameTie && (
                         <span style={{ fontSize: 11, marginLeft: row.ssrBonus > 0 ? 6 : 0, color: row.isClickGameWinner ? palette.gold : palette.sub }}>
