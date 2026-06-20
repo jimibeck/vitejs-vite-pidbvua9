@@ -161,6 +161,103 @@ function getSSRTitleCard() {
   return getPlayerTitleByTitle(SSR_TITLE) || PLAYER_TITLES[0];
 }
 
+const CARD_ASSIGNMENTS_KEY = "card_assignments_v3";
+
+function shuffleArray(arr) {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function getDeckEligibleNames() {
+  return SQUAD_MEMBERS
+    .filter((m) => m.name !== MASTER_NAME)
+    .map((m) => m.name);
+}
+
+function buildAssignmentDeck() {
+  const regularCards = PLAYER_TITLES
+    .filter((card) => card.title !== SSR_TITLE)
+    .slice(0, 9);
+
+  return [
+    { title: MASTER_TITLE, img: MASTER_IMG },
+    { title: SSR_TITLE, img: IMG_SUBONG_SSR },
+    ...regularCards,
+  ];
+}
+
+function buildFreshCardAssignments() {
+  const names = getDeckEligibleNames();
+  const deck = shuffleArray(buildAssignmentDeck());
+
+  const assignments = {};
+  names.forEach((name, idx) => {
+    const card = deck[idx];
+    if (card) assignments[name] = { title: card.title, img: card.img };
+  });
+
+  return assignments;
+}
+
+function isValidCardAssignments(assignments) {
+  if (!assignments || typeof assignments !== "object") return false;
+
+  const names = getDeckEligibleNames();
+  const cards = names.map((name) => assignments[name]).filter(Boolean);
+
+  if (cards.length !== names.length) return false;
+
+  const titles = cards.map((card) => normalizeTitleText(card.title)).filter(Boolean);
+  const uniqueTitles = new Set(titles);
+
+  if (uniqueTitles.size !== names.length) return false;
+  if (!uniqueTitles.has(MASTER_TITLE)) return false;
+  if (!uniqueTitles.has(SSR_TITLE)) return false;
+
+  return true;
+}
+
+async function getOrCreateCardAssignments() {
+  try {
+    const result = await dbStorage.get(CARD_ASSIGNMENTS_KEY);
+    const saved = safeJsonParse(result?.value, null);
+
+    if (isValidCardAssignments(saved)) {
+      return saved;
+    }
+  } catch {}
+
+  const fresh = buildFreshCardAssignments();
+
+  try {
+    await dbStorage.set(CARD_ASSIGNMENTS_KEY, JSON.stringify(fresh));
+  } catch {}
+
+  return fresh;
+}
+
+function getAssignedCardForName(name, assignments) {
+  if (name === MASTER_NAME) {
+    return { title: MASTER_TITLE, img: MASTER_IMG };
+  }
+
+  const assigned = assignments?.[name];
+  if (!assigned) return null;
+
+  const title = normalizeTitleText(assigned.title);
+  const card = getPlayerTitleByTitle(title);
+
+  if (title === MASTER_TITLE) return { title: MASTER_TITLE, img: MASTER_IMG };
+  if (title === SSR_TITLE) return { title: SSR_TITLE, img: IMG_SUBONG_SSR };
+  if (card) return { title: card.title, img: card.img };
+
+  return null;
+}
+
 function makeDisplayName(name, title) {
   return `${title} (${name})`;
 }
@@ -203,35 +300,19 @@ function normalizeMembersImages(membersData) {
   return normalized;
 }
 
-function sanitizeRosterUniqueCharacters(rosterData) {
-  const usedTitles = new Set();
-
+function sanitizeRosterUniqueCharacters(rosterData, cardAssignments = {}) {
   return (Array.isArray(rosterData) ? rosterData : []).map((raw) => {
-    let entry = normalizeLatestProfileImage(raw);
+    const entry = normalizeLatestProfileImage(raw);
+    const assignedCard = getAssignedCardForName(entry.name, cardAssignments);
 
-    if (entry.name === MASTER_NAME) {
-      return {
-        ...entry,
-        title: MASTER_TITLE,
-        img: MASTER_IMG,
-        displayName: makeDisplayName(entry.name, MASTER_TITLE),
-      };
-    }
+    if (!assignedCard) return entry;
 
-    const currentTitle = normalizeTitleText(entry.title);
-    const currentCard = getPlayerTitleByTitle(currentTitle);
-    const canKeep = currentCard && !usedTitles.has(currentTitle);
-    const card = canKeep ? currentCard : pickRandomPlayerTitle([...usedTitles], { allowSSR: true });
-
-    if (!card) return entry;
-
-    usedTitles.add(card.title);
     return normalizeLatestProfileImage({
       ...entry,
-      title: card.title,
-      img: card.img,
-      displayName: makeDisplayName(entry.name, card.title),
-      isSSR: false,
+      title: assignedCard.title,
+      img: assignedCard.img,
+      displayName: makeDisplayName(entry.name, assignedCard.title),
+      isSSR: assignedCard.title === SSR_TITLE,
     });
   });
 }
@@ -496,10 +577,17 @@ export default function App() {
   useEffect(() => {
     const load = async () => {
       let loadedRoster = [];
+      let cardAssignments = {};
+
+      try {
+        cardAssignments = await getOrCreateCardAssignments();
+      } catch {
+        cardAssignments = buildFreshCardAssignments();
+      }
 
       try {
         const rosterResult = await dbStorage.get("roster");
-        loadedRoster = sanitizeRosterUniqueCharacters(safeJsonParse(rosterResult?.value, []));
+        loadedRoster = sanitizeRosterUniqueCharacters(safeJsonParse(rosterResult?.value, []), cardAssignments);
         setRoster(loadedRoster);
         if (rosterResult && rosterResult.value) {
           await dbStorage.set("roster", JSON.stringify(loadedRoster));
@@ -619,22 +707,23 @@ export default function App() {
         return;
       }
 
-      const usedTitles = getUsedPlayerTitlesFromRoster(roster);
-      let title;
-      let img;
+      let cardAssignments = {};
 
-      if (name === MASTER_NAME) {
-        title = MASTER_TITLE;
-        img = MASTER_IMG;
-      } else {
-        const picked = pickRandomPlayerTitle(usedTitles, { allowSSR: true });
-        if (!picked) {
-          setError("배정 가능한 연습생 카드가 모두 사용되었습니다. 관리자에게 문의해주세요.");
-          return;
-        }
-        title = picked.title;
-        img = picked.img;
+      try {
+        cardAssignments = await getOrCreateCardAssignments();
+      } catch {
+        cardAssignments = buildFreshCardAssignments();
       }
+
+      const assignedCard = getAssignedCardForName(name, cardAssignments);
+
+      if (!assignedCard) {
+        setError("배정 가능한 연습생 카드가 모두 사용되었습니다. 관리자에게 문의해주세요.");
+        return;
+      }
+
+      const title = assignedCard.title;
+      const img = assignedCard.img;
 
       const displayName = makeDisplayName(name, title);
       const newUser = normalizeLatestProfileImage({ name, pin, displayName, title, img, squad: member.squad, isNew: true });
