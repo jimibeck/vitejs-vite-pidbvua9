@@ -180,11 +180,9 @@ function getDeckEligibleNames() {
 
 function buildAssignmentDeck() {
   const regularCards = PLAYER_TITLES
-    .filter((card) => card.title !== SSR_TITLE)
-    .slice(0, 9);
+    .filter((card) => card.title !== SSR_TITLE);
 
   return [
-    { title: MASTER_TITLE, img: MASTER_IMG },
     { title: SSR_TITLE, img: IMG_SUBONG_SSR },
     ...regularCards,
   ];
@@ -215,7 +213,7 @@ function isValidCardAssignments(assignments) {
   const uniqueTitles = new Set(titles);
 
   if (uniqueTitles.size !== names.length) return false;
-  if (!uniqueTitles.has(MASTER_TITLE)) return false;
+  if (uniqueTitles.has(MASTER_TITLE)) return false;
   if (!uniqueTitles.has(SSR_TITLE)) return false;
 
   return true;
