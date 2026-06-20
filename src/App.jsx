@@ -2137,7 +2137,9 @@ export default function App() {
               <br />
               시즌 종료 시 누적 클릭 1위 연습생에게
               <br />
-              <b>👑 SUPER TRAINEE</b> 칭호와 함께 <b>⏰ +1시간 시차</b>가 부여됩니다.
+              <b>👑 SUPER TRAINEE</b> 칭호와 함께 
+              <br />
+              <b>⏰ +1시간 시차</b>가 부여됩니다.
               <br />
               <span style={{ fontSize: 12 }}>(경기 결과 적중 여부와 무관)</span>
             </li>
