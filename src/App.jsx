@@ -79,8 +79,8 @@ const TITLE_TEXT_UPDATES = {
 };
 
 function isSSRBooster(entry) {
-  const text = `${entry?.name || ""} ${entry?.title || ""} ${entry?.displayName || ""}`;
-  return text.includes(SSR_BOOSTER_NAME) || text.includes("수봉킴") || text.includes("SUBONG KIM");
+  const text = `${entry?.title || ""} ${entry?.displayName || ""}`;
+  return text.includes(SSR_TITLE) || text.includes("수봉킴") || text.includes("SUBONG KIM");
 }
 
 function getSSRBoostHours(entry) {
@@ -218,22 +218,10 @@ function sanitizeRosterUniqueCharacters(rosterData) {
       };
     }
 
-    if (entry.name === SSR_BOOSTER_NAME) {
-      const ssr = getSSRTitleCard();
-      usedTitles.add(ssr.title);
-      return normalizeLatestProfileImage({
-        ...entry,
-        title: ssr.title,
-        img: ssr.img,
-        displayName: makeDisplayName(entry.name, ssr.title),
-        isSSR: true,
-      });
-    }
-
     const currentTitle = normalizeTitleText(entry.title);
     const currentCard = getPlayerTitleByTitle(currentTitle);
-    const canKeep = currentCard && currentTitle !== SSR_TITLE && !usedTitles.has(currentTitle);
-    const card = canKeep ? currentCard : pickRandomPlayerTitle([...usedTitles], { allowSSR: false });
+    const canKeep = currentCard && !usedTitles.has(currentTitle);
+    const card = canKeep ? currentCard : pickRandomPlayerTitle([...usedTitles], { allowSSR: true });
 
     if (!card) return entry;
 
@@ -638,12 +626,8 @@ export default function App() {
       if (name === MASTER_NAME) {
         title = MASTER_TITLE;
         img = MASTER_IMG;
-      } else if (name === SSR_BOOSTER_NAME) {
-        const picked = getSSRTitleCard();
-        title = picked.title;
-        img = picked.img;
       } else {
-        const picked = pickRandomPlayerTitle(usedTitles, { allowSSR: false });
+        const picked = pickRandomPlayerTitle(usedTitles, { allowSSR: true });
         if (!picked) {
           setError("배정 가능한 연습생 카드가 모두 사용되었습니다. 관리자에게 문의해주세요.");
           return;
@@ -1244,7 +1228,7 @@ export default function App() {
 
 
   if (gachaUser) {
-    const isSSR = gachaUser.name === SSR_BOOSTER_NAME;
+    const isSSR = isSSRBooster(gachaUser);
     const aura = isSSR ? "#A855F7" : palette.gold;
     const avatarSize = isSSR ? 210 : 176;
 
@@ -1261,15 +1245,11 @@ export default function App() {
             to { opacity: 1; }
           }
           @keyframes gachaCardReveal {
-            0% { opacity: 0; transform: perspective(900px) rotateY(180deg) scale(0.68); filter: blur(10px); }
-            18% { opacity: 0; transform: perspective(900px) rotateY(180deg) scale(0.68); filter: blur(10px); }
-            30% { opacity: 1; transform: perspective(900px) rotateY(180deg) scale(0.86); filter: blur(5px); }
-            44% { transform: perspective(900px) rotateY(180deg) scale(0.98); filter: blur(2px); }
-            54% { transform: perspective(900px) rotateY(156deg) scale(1.03); filter: blur(0); }
-            66% { transform: perspective(900px) rotateY(112deg) scale(1.05); }
-            78% { transform: perspective(900px) rotateY(62deg) scale(1.04); }
-            90% { transform: perspective(900px) rotateY(18deg) scale(1.02); }
-            100% { opacity: 1; transform: perspective(900px) rotateY(0deg) scale(1); filter: blur(0); }
+            0% { opacity: 0; transform: perspective(900px) rotateY(180deg) scale(0.72); filter: blur(6px); }
+            30% { opacity: 1; transform: perspective(900px) rotateY(110deg) scale(0.92); filter: blur(2px); }
+            55% { transform: perspective(900px) rotateY(28deg) scale(1.06); filter: blur(0); }
+            72% { transform: perspective(900px) rotateY(-8deg) scale(1.02); }
+            100% { transform: perspective(900px) rotateY(0deg) scale(1); opacity: 1; filter: blur(0); }
           }
           @keyframes gachaShake {
             0%, 100% { transform: translateX(0); }
@@ -1450,7 +1430,7 @@ export default function App() {
               boxShadow: isSSR
                 ? "0 0 48px rgba(168,85,247,0.85), 0 0 110px rgba(236,72,153,0.42)"
                 : "0 0 42px rgba(255,200,87,0.78), 0 0 90px rgba(255,200,87,0.30)",
-              animation: `${isSSR ? "gachaPurpleGlow" : "gachaGoldGlow"} 2.4s ease-in-out 3, gachaCardReveal 6.4s cubic-bezier(.18,.82,.18,1) both, gachaShake 760ms ease-in-out 3.15s 1`,
+              animation: `${isSSR ? "gachaPurpleGlow" : "gachaGoldGlow"} 2.4s ease-in-out 3, gachaCardReveal 1.35s cubic-bezier(.2,.9,.2,1) 4.2s both, gachaShake 760ms ease-in-out 3.15s 1`,
               overflow: "hidden",
             }}
           >
@@ -1465,7 +1445,7 @@ export default function App() {
               }}
             />
 
-            <div style={{ position: "relative", zIndex: 1, animation: "gachaDelayedContent 6.6s ease both" }}>
+            <div style={{ position: "relative", zIndex: 1, animation: "gachaDelayedContent 5.65s ease both" }}>
               <div
                 style={{
                   fontSize: isSSR ? 28 : 23,
