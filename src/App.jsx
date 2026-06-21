@@ -61,13 +61,16 @@ const IMG_SUBONG_SSR = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDA
 // ───────────────────────────────────────────────
 // 칭호
 // ───────────────────────────────────────────────
-const MASTER_TITLE = "🎬 우리가 모든 것을 엎어! 원타임 TEDDY";
+const MASTER_TITLE = "🎬 더고기레이블 대표! 테디";
 const MASTER_NAME = "전진우";
 const SSR_BOOSTER_NAME = "김수봉";
 const SSR_TITLE = "🎤 신세계의 박효신! 수봉킴";
 const SSR_BOOST_HOURS = 1;
 
 const TITLE_TEXT_UPDATES = {
+  "🎬 우리가 모든 것을 엎어! 원타임 TEDDY": "🎬 더고기레이블 대표! 테디",
+  "🎬 우리가 모든 것을 엎어! 원타임 테디": "🎬 더고기레이블 대표! 테디",
+  "🎬 더고기레이블 대표! 원타임 테디": "🎬 더고기레이블 대표! 테디",
   "🎤 신세계의 박효신! 민재봉 SUBONG KIM": "🎤 신세계의 박효신! 수봉킴",
   "🤣 영크크 외치다 야근크크! 코르티스 주훈": "🤣 야근크크! 코르티스 주훈",
   "🍊 고기팀 럭키비키 아기감귤! 아이브 리즈": "🍊 럭키비키 아기감귤! 아이브 리즈",
@@ -76,8 +79,8 @@ const TITLE_TEXT_UPDATES = {
 };
 
 function isSSRBooster(entry) {
-  const text = `${entry?.name || ""} ${entry?.title || ""} ${entry?.displayName || ""}`;
-  return text.includes(SSR_BOOSTER_NAME) || text.includes("수봉킴") || text.includes("SUBONG KIM");
+  const text = `${entry?.title || ""} ${entry?.displayName || ""}`;
+  return text.includes(SSR_TITLE) || text.includes("수봉킴") || text.includes("SUBONG KIM");
 }
 
 function getSSRBoostHours(entry) {
@@ -158,6 +161,101 @@ function getSSRTitleCard() {
   return getPlayerTitleByTitle(SSR_TITLE) || PLAYER_TITLES[0];
 }
 
+const CARD_ASSIGNMENTS_KEY = "card_assignments_v3";
+
+function shuffleArray(arr) {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function getDeckEligibleNames() {
+  return SQUAD_MEMBERS
+    .filter((m) => m.name !== MASTER_NAME)
+    .map((m) => m.name);
+}
+
+function buildAssignmentDeck() {
+  const regularCards = PLAYER_TITLES
+    .filter((card) => card.title !== SSR_TITLE);
+
+  return [
+    { title: SSR_TITLE, img: IMG_SUBONG_SSR },
+    ...regularCards,
+  ];
+}
+
+function buildFreshCardAssignments() {
+  const names = getDeckEligibleNames();
+  const deck = shuffleArray(buildAssignmentDeck());
+
+  const assignments = {};
+  names.forEach((name, idx) => {
+    const card = deck[idx];
+    if (card) assignments[name] = { title: card.title, img: card.img };
+  });
+
+  return assignments;
+}
+
+function isValidCardAssignments(assignments) {
+  if (!assignments || typeof assignments !== "object") return false;
+
+  const names = getDeckEligibleNames();
+  const cards = names.map((name) => assignments[name]).filter(Boolean);
+
+  if (cards.length !== names.length) return false;
+
+  const titles = cards.map((card) => normalizeTitleText(card.title)).filter(Boolean);
+  const uniqueTitles = new Set(titles);
+
+  if (uniqueTitles.size !== names.length) return false;
+  if (uniqueTitles.has(MASTER_TITLE)) return false;
+  if (!uniqueTitles.has(SSR_TITLE)) return false;
+
+  return true;
+}
+
+async function getOrCreateCardAssignments() {
+  try {
+    const result = await dbStorage.get(CARD_ASSIGNMENTS_KEY);
+    const saved = safeJsonParse(result?.value, null);
+
+    if (isValidCardAssignments(saved)) {
+      return saved;
+    }
+  } catch {}
+
+  const fresh = buildFreshCardAssignments();
+
+  try {
+    await dbStorage.set(CARD_ASSIGNMENTS_KEY, JSON.stringify(fresh));
+  } catch {}
+
+  return fresh;
+}
+
+function getAssignedCardForName(name, assignments) {
+  if (name === MASTER_NAME) {
+    return { title: MASTER_TITLE, img: MASTER_IMG };
+  }
+
+  const assigned = assignments?.[name];
+  if (!assigned) return null;
+
+  const title = normalizeTitleText(assigned.title);
+  const card = getPlayerTitleByTitle(title);
+
+  if (title === MASTER_TITLE) return { title: MASTER_TITLE, img: MASTER_IMG };
+  if (title === SSR_TITLE) return { title: SSR_TITLE, img: IMG_SUBONG_SSR };
+  if (card) return { title: card.title, img: card.img };
+
+  return null;
+}
+
 function makeDisplayName(name, title) {
   return `${title} (${name})`;
 }
@@ -200,47 +298,19 @@ function normalizeMembersImages(membersData) {
   return normalized;
 }
 
-function sanitizeRosterUniqueCharacters(rosterData) {
-  const usedTitles = new Set();
-
+function sanitizeRosterUniqueCharacters(rosterData, cardAssignments = {}) {
   return (Array.isArray(rosterData) ? rosterData : []).map((raw) => {
-    let entry = normalizeLatestProfileImage(raw);
+    const entry = normalizeLatestProfileImage(raw);
+    const assignedCard = getAssignedCardForName(entry.name, cardAssignments);
 
-    if (entry.name === MASTER_NAME) {
-      return {
-        ...entry,
-        title: MASTER_TITLE,
-        img: MASTER_IMG,
-        displayName: makeDisplayName(entry.name, MASTER_TITLE),
-      };
-    }
+    if (!assignedCard) return entry;
 
-    if (entry.name === SSR_BOOSTER_NAME) {
-      const ssr = getSSRTitleCard();
-      usedTitles.add(ssr.title);
-      return normalizeLatestProfileImage({
-        ...entry,
-        title: ssr.title,
-        img: ssr.img,
-        displayName: makeDisplayName(entry.name, ssr.title),
-        isSSR: true,
-      });
-    }
-
-    const currentTitle = normalizeTitleText(entry.title);
-    const currentCard = getPlayerTitleByTitle(currentTitle);
-    const canKeep = currentCard && currentTitle !== SSR_TITLE && !usedTitles.has(currentTitle);
-    const card = canKeep ? currentCard : pickRandomPlayerTitle([...usedTitles], { allowSSR: false });
-
-    if (!card) return entry;
-
-    usedTitles.add(card.title);
     return normalizeLatestProfileImage({
       ...entry,
-      title: card.title,
-      img: card.img,
-      displayName: makeDisplayName(entry.name, card.title),
-      isSSR: false,
+      title: assignedCard.title,
+      img: assignedCard.img,
+      displayName: makeDisplayName(entry.name, assignedCard.title),
+      isSSR: assignedCard.title === SSR_TITLE,
     });
   });
 }
@@ -425,6 +495,185 @@ function Avatar({ src, size = 36, ring }) {
   );
 }
 
+
+function GachaIntro({ onRevealEnd }) {
+  const [gachaPhase, setGachaPhase] = useState("spinning");
+
+  useEffect(() => {
+    if (gachaPhase === "spinning") {
+      const t = setTimeout(() => setGachaPhase("reveal"), 2200);
+      return () => clearTimeout(t);
+    }
+
+    if (gachaPhase === "reveal") {
+      const t = setTimeout(() => {
+        if (onRevealEnd) onRevealEnd();
+      }, 650);
+      return () => clearTimeout(t);
+    }
+  }, [gachaPhase, onRevealEnd]);
+
+  const gachaKeyframes = `
+    @keyframes introBgPulse {
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 1; }
+    }
+    @keyframes introOrbit {
+      from { transform: rotate(0deg) translateX(120px) rotate(0deg); }
+      to { transform: rotate(360deg) translateX(120px) rotate(-360deg); }
+    }
+    @keyframes introOrbitReverse {
+      from { transform: rotate(360deg) translateX(85px) rotate(-360deg); }
+      to { transform: rotate(0deg) translateX(85px) rotate(0deg); }
+    }
+    @keyframes introCardShake {
+      0%, 100% { transform: translateX(0) rotate(0deg); }
+      20% { transform: translateX(-6px) rotate(-2deg); }
+      40% { transform: translateX(6px) rotate(2deg); }
+      60% { transform: translateX(-4px) rotate(-1.5deg); }
+      80% { transform: translateX(4px) rotate(1.5deg); }
+    }
+    @keyframes introCardGlow {
+      0%, 100% { box-shadow: 0 0 25px rgba(255,200,87,0.35), 0 0 50px rgba(255,200,87,0.15); }
+      50% { box-shadow: 0 0 45px rgba(255,200,87,0.7), 0 0 90px rgba(255,200,87,0.35); }
+    }
+    @keyframes introFlash {
+      0% { opacity: 0; }
+      15% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    @keyframes introRayBurst {
+      0% { transform: scale(0.2) rotate(0deg); opacity: 0; }
+      30% { opacity: 0.9; }
+      100% { transform: scale(2.4) rotate(60deg); opacity: 0; }
+    }
+  `;
+
+  if (gachaPhase === "spinning") {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#05080F",
+          color: palette.text,
+          fontFamily: "'Pretendard', -apple-system, 'Apple SD Gothic Neo', sans-serif",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 16,
+          overflow: "hidden",
+          position: "relative",
+        }}
+      >
+        <style>{gachaKeyframes}</style>
+
+        <div
+          style={{
+            position: "absolute",
+            width: 420,
+            height: 420,
+            borderRadius: "50%",
+            background: `radial-gradient(circle, rgba(255,200,87,0.25) 0%, rgba(255,200,87,0) 70%)`,
+            animation: "introBgPulse 1.6s ease-in-out infinite",
+          }}
+        />
+
+        <div style={{ position: "relative", width: 220, height: 220, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ position: "absolute", width: 10, height: 10, borderRadius: "50%", background: palette.gold, boxShadow: `0 0 12px ${palette.gold}`, animation: "introOrbit 1.8s linear infinite" }} />
+          <div style={{ position: "absolute", width: 8, height: 8, borderRadius: "50%", background: "#fff", boxShadow: "0 0 10px #fff", animation: "introOrbitReverse 1.4s linear infinite" }} />
+          <div style={{ position: "absolute", width: 6, height: 6, borderRadius: "50%", background: palette.accent2, boxShadow: `0 0 8px ${palette.accent2}`, animation: "introOrbit 2.4s linear infinite reverse" }} />
+
+          <div
+            style={{
+              width: 110,
+              height: 150,
+              borderRadius: 14,
+              background: "linear-gradient(135deg, #1F3654, #0E1A2B)",
+              border: `2px solid ${palette.gold}`,
+              animation: "introCardShake 0.5s ease-in-out infinite, introCardGlow 1.2s ease-in-out infinite",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <span style={{ fontSize: 40, opacity: 0.6 }}>❓</span>
+          </div>
+        </div>
+
+        <div
+          style={{
+            position: "absolute",
+            bottom: "20%",
+            textAlign: "center",
+            width: "100%",
+          }}
+        >
+          <div style={{ fontSize: 16, fontWeight: 800, color: palette.gold, letterSpacing: 1, marginBottom: 6 }}>
+            👑 운명의 카드를 소환하는 중...
+          </div>
+          <div style={{ fontSize: 12, color: palette.sub }}>두근두근... 누가 나올까?</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#05080F",
+        color: palette.text,
+        fontFamily: "'Pretendard', -apple-system, 'Apple SD Gothic Neo', sans-serif",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+        overflow: "hidden",
+        position: "relative",
+      }}
+    >
+      <style>{gachaKeyframes}</style>
+
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "#fff",
+          animation: "introFlash 0.65s ease-out forwards",
+        }}
+      />
+
+      {[0, 60, 120, 180, 240, 300].map((deg) => (
+        <div
+          key={deg}
+          style={{
+            position: "absolute",
+            width: 6,
+            height: 260,
+            background: `linear-gradient(${palette.gold}, transparent)`,
+            transform: `rotate(${deg}deg)`,
+            animation: "introRayBurst 0.65s ease-out forwards",
+            transformOrigin: "center",
+          }}
+        />
+      ))}
+
+      <div
+        style={{
+          width: 130,
+          height: 175,
+          borderRadius: 16,
+          background: `linear-gradient(135deg, ${palette.gold}, #fff)`,
+          animation: "introCardGlow 0.4s ease-in-out infinite",
+          position: "relative",
+          zIndex: 2,
+        }}
+      />
+    </div>
+  );
+}
+
+
 export default function App() {
   const [members, setMembers] = useState({});
   const [roster, setRoster] = useState([]);
@@ -435,7 +684,8 @@ export default function App() {
   const [selected, setSelected] = useState(null);
   const [error, setError] = useState("");
   const [welcomeUser, setWelcomeUser] = useState(null);
-  const [gachaPhase, setGachaPhase] = useState("idle"); // idle | spinning | reveal | done
+  const [gachaUser, setGachaUser] = useState(null);
+  const [gachaIntroDone, setGachaIntroDone] = useState(false);
 
   const [currentUser, setCurrentUser] = useState(null);
   const [loginName, setLoginName] = useState("");
@@ -492,18 +742,6 @@ export default function App() {
     return () => clearTimeout(t);
   }, [chatToast]);
 
-  // 가챠 연출: spinning(소환 중) -> reveal(터지는 순간) -> done(카드 공개)
-  useEffect(() => {
-    if (gachaPhase === "spinning") {
-      const t = setTimeout(() => setGachaPhase("reveal"), 2200);
-      return () => clearTimeout(t);
-    }
-    if (gachaPhase === "reveal") {
-      const t = setTimeout(() => setGachaPhase("done"), 650);
-      return () => clearTimeout(t);
-    }
-  }, [gachaPhase]);
-
   useEffect(() => {
     if (!currentUser) return;
 
@@ -517,10 +755,17 @@ export default function App() {
   useEffect(() => {
     const load = async () => {
       let loadedRoster = [];
+      let cardAssignments = {};
+
+      try {
+        cardAssignments = await getOrCreateCardAssignments();
+      } catch {
+        cardAssignments = buildFreshCardAssignments();
+      }
 
       try {
         const rosterResult = await dbStorage.get("roster");
-        loadedRoster = sanitizeRosterUniqueCharacters(safeJsonParse(rosterResult?.value, []));
+        loadedRoster = sanitizeRosterUniqueCharacters(safeJsonParse(rosterResult?.value, []), cardAssignments);
         setRoster(loadedRoster);
         if (rosterResult && rosterResult.value) {
           await dbStorage.set("roster", JSON.stringify(loadedRoster));
@@ -640,26 +885,23 @@ export default function App() {
         return;
       }
 
-      const usedTitles = getUsedPlayerTitlesFromRoster(roster);
-      let title;
-      let img;
+      let cardAssignments = {};
 
-      if (name === MASTER_NAME) {
-        title = MASTER_TITLE;
-        img = MASTER_IMG;
-      } else if (name === SSR_BOOSTER_NAME) {
-        const picked = getSSRTitleCard();
-        title = picked.title;
-        img = picked.img;
-      } else {
-        const picked = pickRandomPlayerTitle(usedTitles, { allowSSR: false });
-        if (!picked) {
-          setError("배정 가능한 연습생 카드가 모두 사용되었습니다. 관리자에게 문의해주세요.");
-          return;
-        }
-        title = picked.title;
-        img = picked.img;
+      try {
+        cardAssignments = await getOrCreateCardAssignments();
+      } catch {
+        cardAssignments = buildFreshCardAssignments();
       }
+
+      const assignedCard = getAssignedCardForName(name, cardAssignments);
+
+      if (!assignedCard) {
+        setError("배정 가능한 연습생 카드가 모두 사용되었습니다. 관리자에게 문의해주세요.");
+        return;
+      }
+
+      const title = assignedCard.title;
+      const img = assignedCard.img;
 
       const displayName = makeDisplayName(name, title);
       const newUser = normalizeLatestProfileImage({ name, pin, displayName, title, img, squad: member.squad, isNew: true });
@@ -686,7 +928,8 @@ export default function App() {
 
       await pushSystemMessage(`🎉 ${newUser.displayName} 님의 아이디가 생성되었습니다!`);
       setWelcomeUser(newUser);
-      setGachaPhase("spinning");
+      setGachaIntroDone(false);
+      setGachaUser(newUser);
     } else {
       const pin = loginPin.trim();
 
@@ -1251,195 +1494,257 @@ export default function App() {
     );
   };
 
-  if (welcomeUser) {
-    const gachaKeyframes = `
-      @keyframes gachaBgPulse {
-        0%, 100% { opacity: 0.55; }
-        50% { opacity: 1; }
-      }
-      @keyframes gachaOrbit {
-        from { transform: rotate(0deg) translateX(120px) rotate(0deg); }
-        to { transform: rotate(360deg) translateX(120px) rotate(-360deg); }
-      }
-      @keyframes gachaOrbitReverse {
-        from { transform: rotate(360deg) translateX(85px) rotate(-360deg); }
-        to { transform: rotate(0deg) translateX(85px) rotate(0deg); }
-      }
-      @keyframes gachaCardShake {
-        0%, 100% { transform: translateX(0) rotate(0deg); }
-        20% { transform: translateX(-6px) rotate(-2deg); }
-        40% { transform: translateX(6px) rotate(2deg); }
-        60% { transform: translateX(-4px) rotate(-1.5deg); }
-        80% { transform: translateX(4px) rotate(1.5deg); }
-      }
-      @keyframes gachaCardGlow {
-        0%, 100% { box-shadow: 0 0 25px rgba(255,200,87,0.35), 0 0 50px rgba(255,200,87,0.15); }
-        50% { box-shadow: 0 0 45px rgba(255,200,87,0.7), 0 0 90px rgba(255,200,87,0.35); }
-      }
-      @keyframes gachaFlash {
-        0% { opacity: 0; }
-        15% { opacity: 1; }
-        100% { opacity: 0; }
-      }
-      @keyframes gachaRayBurst {
-        0% { transform: scale(0.2) rotate(0deg); opacity: 0; }
-        30% { opacity: 0.9; }
-        100% { transform: scale(2.4) rotate(60deg); opacity: 0; }
-      }
-      @keyframes gachaPortraitPop {
-        0% { transform: scale(0.3); opacity: 0; }
-        55% { transform: scale(1.15); opacity: 1; }
-        75% { transform: scale(0.95); }
-        100% { transform: scale(1); }
-      }
-      @keyframes gachaTitleSlide {
-        0% { transform: translateY(14px); opacity: 0; }
-        100% { transform: translateY(0); opacity: 1; }
-      }
-      @keyframes gachaPinSlide {
-        0% { transform: translateY(14px); opacity: 0; }
-        100% { transform: translateY(0); opacity: 1; }
-      }
-      @keyframes gachaSparkleFloat {
-        0% { transform: translateY(0) scale(0.8); opacity: 0; }
-        20% { opacity: 1; }
-        100% { transform: translateY(-40px) scale(1.2); opacity: 0; }
-      }
-    `;
 
-    // ── 1단계: 소환 중 (spinning) ──
-    if (gachaPhase === "spinning") {
-      return (
-        <div
-          style={{
-            minHeight: "100vh",
-            background: "#05080F",
-            color: palette.text,
-            fontFamily: "'Pretendard', -apple-system, 'Apple SD Gothic Neo', sans-serif",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-            overflow: "hidden",
-            position: "relative",
-          }}
-        >
-          <style>{gachaKeyframes}</style>
-
-          {/* 배경 펄스 글로우 */}
-          <div
-            style={{
-              position: "absolute",
-              width: 420,
-              height: 420,
-              borderRadius: "50%",
-              background: `radial-gradient(circle, rgba(255,200,87,0.25) 0%, rgba(255,200,87,0) 70%)`,
-              animation: "gachaBgPulse 1.6s ease-in-out infinite",
-            }}
-          />
-
-          <div style={{ position: "relative", width: 220, height: 220, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {/* 궤도를 도는 빛 입자들 */}
-            <div style={{ position: "absolute", width: 10, height: 10, borderRadius: "50%", background: palette.gold, boxShadow: `0 0 12px ${palette.gold}`, animation: "gachaOrbit 1.8s linear infinite" }} />
-            <div style={{ position: "absolute", width: 8, height: 8, borderRadius: "50%", background: "#fff", boxShadow: "0 0 10px #fff", animation: "gachaOrbitReverse 1.4s linear infinite" }} />
-            <div style={{ position: "absolute", width: 6, height: 6, borderRadius: "50%", background: palette.accent2, boxShadow: `0 0 8px ${palette.accent2}`, animation: "gachaOrbit 2.4s linear infinite reverse" }} />
-
-            {/* 흔들리는 카드 실루엣 */}
-            <div
-              style={{
-                width: 110,
-                height: 150,
-                borderRadius: 14,
-                background: "linear-gradient(135deg, #1F3654, #0E1A2B)",
-                border: `2px solid ${palette.gold}`,
-                animation: "gachaCardShake 0.5s ease-in-out infinite, gachaCardGlow 1.2s ease-in-out infinite",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <span style={{ fontSize: 40, opacity: 0.6 }}>❓</span>
-            </div>
-          </div>
-
-          <div
-            style={{
-              position: "absolute",
-              bottom: "20%",
-              textAlign: "center",
-              width: "100%",
-            }}
-          >
-            <div style={{ fontSize: 16, fontWeight: 800, color: palette.gold, letterSpacing: 1, marginBottom: 6 }}>
-              👑 운명의 카드를 소환하는 중...
-            </div>
-            <div style={{ fontSize: 12, color: palette.sub }}>두근두근... 누가 나올까?</div>
-          </div>
-        </div>
-      );
+  if (gachaUser) {
+    if (!gachaIntroDone) {
+      return <GachaIntro onRevealEnd={() => setGachaIntroDone(true)} />;
     }
 
-    // ── 2단계: 터지는 순간 (reveal) ──
-    if (gachaPhase === "reveal") {
-      return (
+    const isSSR = isSSRBooster(gachaUser);
+    const aura = isSSR ? "#A855F7" : palette.gold;
+    const avatarSize = isSSR ? 210 : 176;
+
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          fontFamily: "'Pretendard', -apple-system, 'Apple SD Gothic Neo', sans-serif",
+        }}
+      >
+        <style>{`
+          @keyframes cardRevealFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          @keyframes gachaCardReveal {
+            0% { opacity: 0; transform: perspective(900px) rotateY(180deg) scale(0.72); filter: blur(6px); }
+            30% { opacity: 1; transform: perspective(900px) rotateY(110deg) scale(0.92); filter: blur(2px); }
+            55% { transform: perspective(900px) rotateY(28deg) scale(1.06); filter: blur(0); }
+            72% { transform: perspective(900px) rotateY(-8deg) scale(1.02); }
+            100% { transform: perspective(900px) rotateY(0deg) scale(1); opacity: 1; filter: blur(0); }
+          }
+          @keyframes gachaShake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+            20%, 40%, 60%, 80% { transform: translateX(3px); }
+          }
+          @keyframes gachaGoldGlow {
+            0%, 100% { box-shadow: 0 0 28px rgba(255,200,87,0.55), 0 0 64px rgba(255,200,87,0.24); }
+            50% { box-shadow: 0 0 42px rgba(255,200,87,0.92), 0 0 92px rgba(255,200,87,0.36); }
+          }
+          @keyframes gachaPurpleGlow {
+            0%, 100% { box-shadow: 0 0 34px rgba(168,85,247,0.72), 0 0 74px rgba(236,72,153,0.32); }
+            50% { box-shadow: 0 0 56px rgba(168,85,247,1), 0 0 118px rgba(236,72,153,0.56); }
+          }
+          @keyframes gachaFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+          }
+          @keyframes revealSlash {
+            0% { opacity: 0; transform: translateX(-140%) rotate(-18deg); }
+            30% { opacity: 1; }
+            100% { opacity: 0; transform: translateX(150%) rotate(-18deg); }
+          }
+          @keyframes ssrSecondBurst {
+            0%, 72% { opacity: 0; transform: scale(0.55); }
+            80% { opacity: 1; transform: scale(1.08); }
+            100% { opacity: 0; transform: scale(1.8); }
+          }
+          @keyframes cardContentAppear {
+            0%, 58% { opacity: 0; transform: translateY(8px); }
+            100% { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
+
         <div
           style={{
-            minHeight: "100vh",
-            background: "#05080F",
-            color: palette.text,
-            fontFamily: "'Pretendard', -apple-system, 'Apple SD Gothic Neo', sans-serif",
+            position: "fixed",
+            inset: 0,
+            zIndex: 5000,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: 16,
+            padding: 18,
+            background: isSSR
+              ? "radial-gradient(circle at 50% 34%, rgba(168,85,247,0.46), rgba(236,72,153,0.20) 35%, rgba(2,6,23,0.98) 76%)"
+              : "radial-gradient(circle at 50% 34%, rgba(255,200,87,0.42), rgba(245,158,11,0.16) 35%, rgba(2,6,23,0.97) 76%)",
+            animation: "cardRevealFadeIn 220ms ease both",
             overflow: "hidden",
-            position: "relative",
           }}
         >
-          <style>{gachaKeyframes}</style>
-
-          {/* 화이트 플래시 */}
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              background: "#fff",
-              animation: "gachaFlash 0.65s ease-out forwards",
-            }}
-          />
-
-          {/* 방사형 광선 폭발 */}
-          {[0, 60, 120, 180, 240, 300].map((deg) => (
+          {isSSR && (
             <div
-              key={deg}
               style={{
                 position: "absolute",
-                width: 6,
-                height: 260,
-                background: `linear-gradient(${palette.gold}, transparent)`,
-                transform: `rotate(${deg}deg)`,
-                animation: "gachaRayBurst 0.65s ease-out forwards",
-                transformOrigin: "center",
+                width: 340,
+                height: 340,
+                borderRadius: "50%",
+                border: "2px solid rgba(216,180,254,0.55)",
+                animation: "ssrSecondBurst 4.2s ease-out 1",
+                pointerEvents: "none",
               }}
             />
-          ))}
+          )}
 
           <div
             style={{
-              width: 130,
-              height: 175,
-              borderRadius: 16,
-              background: `linear-gradient(135deg, ${palette.gold}, #fff)`,
-              animation: "gachaCardGlow 0.4s ease-in-out infinite",
               position: "relative",
-              zIndex: 2,
+              width: "min(94vw, 430px)",
+              borderRadius: 28,
+              padding: isSSR ? "24px 18px 20px" : "22px 18px 18px",
+              textAlign: "center",
+              color: palette.text,
+              border: isSSR ? "2px solid rgba(168,85,247,0.95)" : `2px solid ${palette.gold}`,
+              background: isSSR
+                ? "linear-gradient(180deg, rgba(88,28,135,0.98), rgba(17,24,39,0.98) 48%, rgba(24,14,42,0.98))"
+                : "linear-gradient(180deg, rgba(120,78,20,0.98), rgba(17,24,39,0.98) 48%, rgba(38,29,13,0.98))",
+              boxShadow: isSSR
+                ? "0 0 48px rgba(168,85,247,0.85), 0 0 110px rgba(236,72,153,0.42)"
+                : "0 0 42px rgba(255,200,87,0.78), 0 0 90px rgba(255,200,87,0.30)",
+              animation: `${isSSR ? "gachaPurpleGlow" : "gachaGoldGlow"} 1.6s ease-in-out infinite, gachaCardReveal 1.35s cubic-bezier(.2,.9,.2,1) both, gachaShake 520ms ease-in-out 360ms 1`,
+              overflow: "hidden",
             }}
-          />
-        </div>
-      );
-    }
+          >
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: isSSR
+                  ? "linear-gradient(135deg, rgba(216,180,254,0.22), transparent 38%, rgba(236,72,153,0.18))"
+                  : "linear-gradient(135deg, rgba(255,239,184,0.22), transparent 38%, rgba(255,200,87,0.18))",
+                pointerEvents: "none",
+              }}
+            />
 
-    // ── 3단계: 카드 공개 (done) ──
+            <div
+              style={{
+                position: "absolute",
+                top: "18%",
+                left: "-20%",
+                width: "140%",
+                height: 4,
+                borderRadius: 999,
+                background: isSSR ? "linear-gradient(90deg, transparent, #F3E8FF, transparent)" : "linear-gradient(90deg, transparent, #FFF4C2, transparent)",
+                boxShadow: isSSR ? "0 0 20px #A855F7" : "0 0 18px #FFC857",
+                animation: "revealSlash 720ms ease-out 880ms both",
+                pointerEvents: "none",
+              }}
+            />
+
+            <div style={{ position: "relative", zIndex: 1, animation: "cardContentAppear 1.55s ease both" }}>
+              <div
+                style={{
+                  fontSize: isSSR ? 28 : 23,
+                  fontWeight: 1000,
+                  letterSpacing: isSSR ? 1.2 : 0.8,
+                  color: isSSR ? "#F3E8FF" : "#FFF4C2",
+                  textShadow: isSSR ? "0 0 16px rgba(168,85,247,0.95)" : "0 0 14px rgba(255,200,87,0.85)",
+                  marginBottom: 6,
+                }}
+              >
+                {isSSR ? "✨ SPECIAL MEMBER ✨" : "⭐⭐⭐⭐"}
+              </div>
+
+              {!isSSR && (
+                <div
+                  style={{
+                    color: "#FFE9A6",
+                    fontSize: 18,
+                    fontWeight: 1000,
+                    letterSpacing: 1.6,
+                    marginBottom: 10,
+                  }}
+                >
+                  SPECIAL MEMBER
+                </div>
+              )}
+
+              <div
+                style={{
+                  fontSize: isSSR ? 19 : 17,
+                  fontWeight: 900,
+                  lineHeight: 1.35,
+                  marginBottom: 16,
+                  wordBreak: "keep-all",
+                  overflowWrap: "anywhere",
+                  padding: "0 8px",
+                }}
+              >
+                🎤 {gachaUser.title}
+              </div>
+
+              <div
+                style={{
+                  display: "inline-flex",
+                  padding: isSSR ? 8 : 7,
+                  borderRadius: "50%",
+                  background: isSSR ? "rgba(168,85,247,0.18)" : "rgba(255,200,87,0.16)",
+                  border: `2px solid ${aura}`,
+                  animation: "gachaFloat 2s ease-in-out infinite",
+                }}
+              >
+                <Avatar src={gachaUser.img} size={avatarSize} ring={aura} />
+              </div>
+
+              {isSSR ? (
+                <>
+                  <div style={{ marginTop: 15, fontSize: 24, fontWeight: 1000, color: "#E9D5FF" }}>
+                    ⭐⭐⭐⭐⭐ SSR
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 8,
+                      display: "inline-block",
+                      padding: "8px 14px",
+                      borderRadius: 999,
+                      background: "rgba(168,85,247,0.22)",
+                      border: "1px solid rgba(216,180,254,0.72)",
+                      color: "#F3E8FF",
+                      fontSize: 13,
+                      fontWeight: 1000,
+                      letterSpacing: 1,
+                    }}
+                  >
+                    SPECIAL BOOSTER +1H
+                  </div>
+                </>
+              ) : (
+                <div style={{ marginTop: 14, fontSize: 13, color: "#FFE9A6", fontWeight: 900 }}>
+                  GOLD MEMBER CARD
+                </div>
+              )}
+
+              <button
+                onClick={() => {
+                  setGachaUser(null);
+                  setGachaIntroDone(false);
+                }}
+                style={{
+                  marginTop: 18,
+                  width: "100%",
+                  border: "none",
+                  borderRadius: 999,
+                  padding: "13px 16px",
+                  background: isSSR
+                    ? "linear-gradient(90deg, #A855F7, #EC4899)"
+                    : "linear-gradient(90deg, #F59E0B, #FFC857)",
+                  color: isSSR ? "#fff" : "#111827",
+                  fontWeight: 1000,
+                  fontSize: 15,
+                  cursor: "pointer",
+                  boxShadow: isSSR ? "0 8px 22px rgba(168,85,247,0.35)" : "0 8px 22px rgba(255,200,87,0.25)",
+                }}
+              >
+                {isSSR ? "👑 카드 확인 완료" : "카드 확인 완료"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (welcomeUser) {
     return (
       <div
         style={{
@@ -1451,28 +1756,8 @@ export default function App() {
           alignItems: "center",
           justifyContent: "center",
           padding: 16,
-          position: "relative",
-          overflow: "hidden",
         }}
       >
-        <style>{gachaKeyframes}</style>
-
-        {/* 등장 후 떠다니는 반짝임 */}
-        {[15, 75, 30, 85, 50].map((left, i) => (
-          <div
-            key={i}
-            style={{
-              position: "absolute",
-              left: `${left}%`,
-              bottom: "30%",
-              fontSize: 14 + (i % 3) * 4,
-              animation: `gachaSparkleFloat ${1.6 + i * 0.3}s ease-out ${i * 0.25}s infinite`,
-            }}
-          >
-            ✨
-          </div>
-        ))}
-
         <div
           style={{
             background: palette.card,
@@ -1483,12 +1768,10 @@ export default function App() {
             border: `2px solid ${palette.gold}`,
             textAlign: "center",
             boxShadow: `0 0 30px rgba(255,200,87,0.25)`,
-            position: "relative",
-            zIndex: 2,
           }}
         >
           <div style={{ fontSize: 14, color: palette.gold, fontWeight: 700, letterSpacing: 2, marginBottom: 12 }}>
-            🎉 환영한다, 연습생 합류 완료! 🎉
+            🎉 카드 배정 완료! 연습실 입장 준비 🎉
           </div>
 
           <img
@@ -1502,32 +1785,16 @@ export default function App() {
               border: `4px solid ${palette.gold}`,
               margin: "0 auto 16px",
               display: "block",
-              boxShadow: `0 0 24px rgba(255,200,87,0.55)`,
-              animation: "gachaPortraitPop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+              boxShadow: `0 0 20px rgba(255,200,87,0.4)`,
             }}
           />
 
-          <div
-            style={{
-              fontSize: 18,
-              fontWeight: 800,
-              lineHeight: 1.5,
-              marginBottom: 8,
-              animation: "gachaTitleSlide 0.4s ease-out 0.3s both",
-            }}
-          >
+          <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.5, marginBottom: 8 }}>
             {welcomeUser.title}
           </div>
 
-          <div
-            style={{
-              fontSize: 15,
-              color: palette.sub,
-              marginBottom: 16,
-              animation: "gachaTitleSlide 0.4s ease-out 0.4s both",
-            }}
-          >
-            ({welcomeUser.name}) 님으로 배정되었습니다!
+          <div style={{ fontSize: 15, color: palette.sub, marginBottom: 16 }}>
+            ({welcomeUser.name}) 님, 아래 4자리 암호를 기억해주세요!
           </div>
 
           <div
@@ -1537,7 +1804,6 @@ export default function App() {
               padding: "14px",
               marginBottom: 20,
               border: `1px dashed ${palette.accent}`,
-              animation: "gachaPinSlide 0.4s ease-out 0.5s both",
             }}
           >
             <div style={{ fontSize: 13, color: palette.sub, marginBottom: 4 }}>
@@ -1554,10 +1820,7 @@ export default function App() {
           </div>
 
           <button
-            onClick={() => {
-              setWelcomeUser(null);
-              setGachaPhase("idle");
-            }}
+            onClick={() => setWelcomeUser(null)}
             style={{
               width: "100%",
               padding: "14px",
@@ -1568,7 +1831,6 @@ export default function App() {
               fontWeight: 700,
               fontSize: 16,
               cursor: "pointer",
-              animation: "gachaPinSlide 0.4s ease-out 0.6s both",
             }}
           >
             🌙 연습실 입장
@@ -1800,6 +2062,68 @@ export default function App() {
         padding: "24px 16px 60px",
       }}
     >
+      <style>{`
+        @keyframes leaderboardRise {
+          from { opacity: 0; transform: translateY(18px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes medalBounce {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          50% { transform: translateY(-4px) rotate(-3deg); }
+        }
+        @keyframes crownWiggle {
+          0%, 100% { transform: rotate(0deg) scale(1); }
+          25% { transform: rotate(-8deg) scale(1.08); }
+          75% { transform: rotate(8deg) scale(1.08); }
+        }
+        @keyframes ssrAuraPulse {
+          0%, 100% { box-shadow: 0 0 18px rgba(168,85,247,0.42), 0 0 32px rgba(236,72,153,0.18); }
+          50% { box-shadow: 0 0 28px rgba(168,85,247,0.78), 0 0 52px rgba(236,72,153,0.34); }
+        }
+
+        @keyframes gachaFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes gachaCardReveal {
+          0% { transform: perspective(900px) rotateY(180deg) scale(0.72); opacity: 0; filter: blur(6px); }
+          30% { transform: perspective(900px) rotateY(110deg) scale(0.92); opacity: 1; filter: blur(2px); }
+          55% { transform: perspective(900px) rotateY(28deg) scale(1.06); filter: blur(0); }
+          72% { transform: perspective(900px) rotateY(-8deg) scale(1.02); }
+          100% { transform: perspective(900px) rotateY(0deg) scale(1); opacity: 1; filter: blur(0); }
+        }
+        @keyframes gachaShake {
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+          20%, 40%, 60%, 80% { transform: translateX(3px); }
+        }
+        @keyframes gachaLightning {
+          0%, 100% { opacity: 0; transform: scale(0.82) rotate(-8deg); }
+          18% { opacity: 1; transform: scale(1.12) rotate(4deg); }
+          34% { opacity: 0.25; transform: scale(0.94) rotate(-4deg); }
+          50% { opacity: 1; transform: scale(1.18) rotate(8deg); }
+          70% { opacity: 0; transform: scale(1.32) rotate(0deg); }
+        }
+        @keyframes gachaGoldGlow {
+          0%, 100% { box-shadow: 0 0 28px rgba(255,200,87,0.55), 0 0 64px rgba(255,200,87,0.24); }
+          50% { box-shadow: 0 0 42px rgba(255,200,87,0.92), 0 0 92px rgba(255,200,87,0.36); }
+        }
+        @keyframes gachaPurpleGlow {
+          0%, 100% { box-shadow: 0 0 34px rgba(168,85,247,0.72), 0 0 74px rgba(236,72,153,0.32); }
+          50% { box-shadow: 0 0 56px rgba(168,85,247,1), 0 0 118px rgba(236,72,153,0.56); }
+        }
+        @keyframes gachaBurst {
+          0% { opacity: 0; transform: scale(0.5) rotate(0deg); }
+          35% { opacity: 1; transform: scale(1.08) rotate(8deg); }
+          100% { opacity: 0; transform: scale(1.55) rotate(18deg); }
+        }
+        @keyframes gachaFloat {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-6px); }
+        }
+      `}</style>
+
+
       {chatToast && (
         <div
           onClick={() => {
@@ -1875,38 +2199,53 @@ export default function App() {
               marginTop: 10,
               display: "inline-flex",
               alignItems: "center",
-              flexWrap: "wrap",
               gap: 10,
               background: palette.card,
-              borderRadius: 999,
-              padding: "6px 14px",
+              borderRadius: 18,
+              padding: "8px 12px",
               fontSize: 13,
               border: `1px solid #24395C`,
               maxWidth: "100%",
+              boxSizing: "border-box",
             }}
           >
-            <Avatar src={currentUser.img} size={40} ring={palette.gold} />
+            <Avatar src={currentUser.img} size={42} ring={palette.gold} />
 
-            <span style={{ textAlign: "left", lineHeight: 1.3 }}>
-              {currentUser.title}
-              <br />
-              ({currentUser.name})
-            </span>
+            <div style={{ minWidth: 0, textAlign: "left", lineHeight: 1.3 }}>
+              <div
+                style={{
+                  fontWeight: 800,
+                  overflowWrap: "anywhere",
+                  wordBreak: "keep-all",
+                }}
+              >
+                {currentUser.title}
+              </div>
 
-            <span
-              onClick={handleLogout}
-              style={{
-                color: palette.sub,
-                cursor: "pointer",
-                textAlign: "center",
-                lineHeight: 1.3,
-                flexShrink: 0,
-              }}
-            >
-              숙소로
-              <br />
-              돌아가기
-            </span>
+              <div style={{ color: palette.sub, fontSize: 12, marginTop: 2 }}>
+                ({currentUser.name})
+              </div>
+
+              <button
+                onClick={handleLogout}
+                style={{
+                  marginTop: 7,
+                  width: "100%",
+                  border: `1px solid #31476B`,
+                  background: "#0E1A2B",
+                  color: palette.sub,
+                  borderRadius: 999,
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  lineHeight: 1,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                🏠 숙소로 돌아가기
+              </button>
+            </div>
           </div>
         </div>
 
@@ -2053,62 +2392,214 @@ export default function App() {
               </div>
             )}
 
-            {leaderboard.map((row, i) => (
-              <div
-                key={row.name}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 10,
-                  background: row.isSSR ? "linear-gradient(90deg, rgba(255,200,87,0.30), rgba(255,200,87,0.06), #0E1A2B)" : i === 0 ? "linear-gradient(90deg, rgba(255,200,87,0.20), #0E1A2B)" : i === 1 ? "linear-gradient(90deg, rgba(180,190,210,0.16), #0E1A2B)" : i === 2 ? "linear-gradient(90deg, rgba(205,127,50,0.16), #0E1A2B)" : "#0E1A2B",
-                  borderRadius: 10,
-                  border: row.isSSR ? `1px solid ${palette.gold}` : i <= 2 ? `1px solid ${i === 0 ? palette.gold : "#31476B"}` : "1px solid transparent",
-                  padding: "10px 12px",
-                  fontSize: 13,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
-                  <span style={{ color: palette.gold, fontWeight: 700, width: 24, flexShrink: 0 }}>
-                    {row.isMaster ? "👑" : i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}`}
-                  </span>
+            {leaderboard.map((row, i) => {
+              const isTop = i === 0;
+              const isPodium = i <= 2;
+              const avatarSize = isTop ? 190 : 146;
+              const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}등`;
+              const rankLabel = row.isMaster ? "👑" : medal;
+              const cardBorder = row.isSSR
+                ? "1px solid rgba(168,85,247,0.95)"
+                : i === 0
+                  ? `2px solid ${palette.gold}`
+                  : i === 1
+                    ? "1px solid rgba(180,190,210,0.7)"
+                    : i === 2
+                      ? "1px solid rgba(205,127,50,0.7)"
+                      : "1px solid transparent";
 
-                  <Avatar src={row.img} size={36} ring={row.isSSR || row.name === currentUser.name ? palette.gold : undefined} />
+              return (
+                <div
+                  key={row.name}
+                  style={{
+                    position: "relative",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: isTop ? 12 : 9,
+                    background: row.isSSR
+                      ? "radial-gradient(circle at 50% 34%, rgba(168,85,247,0.38), rgba(236,72,153,0.16) 42%, #0E1A2B 86%)"
+                      : i === 0
+                        ? "linear-gradient(180deg, rgba(255,200,87,0.30), rgba(255,200,87,0.10), #0E1A2B)"
+                        : i === 1
+                          ? "linear-gradient(180deg, rgba(180,190,210,0.20), #0E1A2B)"
+                          : i === 2
+                            ? "linear-gradient(180deg, rgba(205,127,50,0.20), #0E1A2B)"
+                            : "#0E1A2B",
+                    borderRadius: isTop ? 20 : 17,
+                    border: cardBorder,
+                    padding: isTop ? "18px 14px" : "14px 12px",
+                    fontSize: 13,
+                    overflow: "hidden",
+                    boxShadow: row.isSSR
+                      ? "0 0 24px rgba(168,85,247,0.58), 0 0 46px rgba(236,72,153,0.20)"
+                      : isTop
+                        ? "0 0 0 1px rgba(255,200,87,0.20), 0 14px 34px rgba(0,0,0,0.38), 0 0 26px rgba(255,200,87,0.22)"
+                        : "none",
+                    animation: `${row.isSSR ? "ssrAuraPulse 2.2s ease-in-out infinite, " : ""}leaderboardRise 420ms ease both`,
+                    animationDelay: `${i * 70}ms`,
+                  }}
+                >
+                  {isTop && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 8,
+                        right: 10,
+                        fontSize: 28,
+                        animation: "crownWiggle 1.8s ease-in-out infinite",
+                        filter: "drop-shadow(0 2px 6px rgba(255,200,87,0.45))",
+                      }}
+                    >
+                      👑
+                    </div>
+                  )}
 
-                  <span
+                  {row.isSSR && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        pointerEvents: "none",
+                        background: "linear-gradient(135deg, rgba(168,85,247,0.15), transparent 44%, rgba(236,72,153,0.12))",
+                      }}
+                    />
+                  )}
+
+                  <div
                     title={row.displayName}
                     style={{
-                      fontWeight: row.name === currentUser.name ? 700 : 400,
-                      color: row.name === currentUser.name ? palette.gold : palette.text,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      minWidth: 0,
+                      position: "relative",
+                      zIndex: 1,
+                      width: "100%",
+                      textAlign: "center",
+                      fontWeight: row.name === currentUser.name || isTop ? 900 : 800,
+                      color: row.isSSR ? "#E9D5FF" : row.name === currentUser.name || isTop ? palette.gold : palette.text,
+                      lineHeight: 1.35,
+                      fontSize: isTop ? 17 : 14,
+                      wordBreak: "keep-all",
+                      overflowWrap: "anywhere",
+                      padding: isTop ? "0 34px" : "0 4px",
+                      boxSizing: "border-box",
                     }}
                   >
-                    {row.isSSR && <span style={{ color: palette.gold, marginRight: 4 }}>👑 SSR</span>}
+                    <span
+                      style={{
+                        display: "inline-block",
+                        marginRight: 6,
+                        animation: isPodium ? "medalBounce 1.7s ease-in-out infinite" : "none",
+                      }}
+                    >
+                      {rankLabel}
+                    </span>
+                    {row.isSSR && <span style={{ color: "#C084FC", marginRight: 5 }}>✨ SSR</span>}
                     {row.displayName}
-                  </span>
-                </div>
-
-                <div style={{ textAlign: "right", color: palette.sub, flexShrink: 0, width: 110 }}>
-                  <div style={{ whiteSpace: "nowrap", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {row.scoreLabel} ({(row.prob * 100).toFixed(1)}%)
                   </div>
-                  <div style={{ color: row.isClickGameTie && !row.isClickGameWinner ? palette.sub : palette.gold, fontWeight: 700, whiteSpace: "nowrap" }}>
-                    {row.perPersonHours}h
-                    {row.ssrBonus > 0 && (
-                      <span style={{ fontSize: 10, marginLeft: 4, color: palette.gold }}>+SSR {row.ssrBonus}h</span>
-                    )}
+
+                  {row.isSSR && (
+                    <div
+                      style={{
+                        position: "relative",
+                        zIndex: 1,
+                        marginTop: -4,
+                        color: "#C084FC",
+                        fontSize: 11,
+                        fontWeight: 900,
+                        letterSpacing: 1.5,
+                      }}
+                    >
+                      SPECIAL BOOSTER +1H
+                    </div>
+                  )}
+
+                  <div style={{ position: "relative", zIndex: 1, width: avatarSize, height: avatarSize, flexShrink: 0 }}>
+                    <Avatar src={row.img} size={avatarSize} ring={row.isSSR ? "#A855F7" : row.name === currentUser.name || isTop ? palette.gold : undefined} />
                     {row.isClickGameTie && (
-                      <span style={{ fontSize: 10, marginLeft: 4 }}>
+                      <span
+                        style={{
+                          position: "absolute",
+                          right: 6,
+                          bottom: 6,
+                          minWidth: 34,
+                          height: 28,
+                          borderRadius: 999,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: "0 8px",
+                          background: row.isClickGameWinner ? "rgba(255,200,87,0.92)" : "rgba(8,16,28,0.86)",
+                          border: `1px solid ${palette.gold}`,
+                          color: row.isClickGameWinner ? "#111827" : palette.gold,
+                          fontWeight: 900,
+                          fontSize: 13,
+                          boxSizing: "border-box",
+                        }}
+                      >
                         {row.isClickGameWinner ? "🖱️🏆" : "🖱️"}
                       </span>
                     )}
                   </div>
+
+                  <div
+                    style={{
+                      position: "relative",
+                      zIndex: 1,
+                      width: "100%",
+                      display: "flex",
+                      flexDirection: isTop ? "column" : "row",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      gap: isTop ? 6 : 10,
+                      textAlign: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        color: palette.text,
+                        fontWeight: 900,
+                        fontSize: isTop ? 19 : 15,
+                        lineHeight: 1.2,
+                        overflowWrap: "anywhere",
+                      }}
+                    >
+                      🎯 {row.scoreLabel}
+                      {!isTop && <span style={{ color: palette.sub, fontWeight: 600, marginLeft: 6 }}>({(row.prob * 100).toFixed(1)}%)</span>}
+                    </div>
+
+                    <div
+                      style={{
+                        color: row.isSSR ? "#C084FC" : row.isClickGameTie && !row.isClickGameWinner ? palette.sub : palette.gold,
+                        fontWeight: 900,
+                        fontSize: isTop ? 25 : 18,
+                        lineHeight: 1.1,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      ⏰ {row.perPersonHours}h
+                    </div>
+
+                    {isTop && (
+                      <div style={{ color: palette.sub, fontSize: 11, lineHeight: 1.2 }}>
+                        {(row.prob * 100).toFixed(1)}%
+                      </div>
+                    )}
+                  </div>
+
+                  {(row.ssrBonus > 0 || row.isClickGameTie) && (
+                    <div style={{ position: "relative", zIndex: 1, minHeight: 16, textAlign: "center", lineHeight: 1.25 }}>
+                      {row.ssrBonus > 0 && (
+                        <span style={{ fontSize: 11, color: "#C084FC", fontWeight: 900 }}>✨ SSR 적중 +{row.ssrBonus}h</span>
+                      )}
+                      {row.isClickGameTie && (
+                        <span style={{ fontSize: 11, marginLeft: row.ssrBonus > 0 ? 6 : 0, color: row.isClickGameWinner ? palette.gold : palette.sub }}>
+                          {row.isClickGameWinner ? "클릭 미니게임 승리" : "클릭 미니게임 참여"}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
