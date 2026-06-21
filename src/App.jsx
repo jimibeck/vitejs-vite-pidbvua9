@@ -2958,7 +2958,7 @@ export default function App() {
               <br />
               CENTER BATTLE 클릭게임으로 결판!
               <br />
-              <span style={{ fontSize: 12 }}>1등만 시차를 받는다. 클릭게임 미진행시 최초 베팅자가 받는다.</span>
+              <span style={{ fontSize: 12 }}>1등만 시차 받는다. 클릭게임 안하면 최초 베팅자 수령.</span>
             </li>
 
             <li style={{ marginTop: 10 }}>
@@ -2968,7 +2968,7 @@ export default function App() {
               <br />
               시즌 종료 시 누적 클릭 1위 연습생에게
               <br />
-              <b>👑 SUPER TRAINEE</b> 칭호와 함께 <b>⏰ 1시간 시차</b>가 부여된다.
+              <b>👑 SUPER TRAINEE</b> 칭호와 함께 <b>⏰ 1시간 시차</b> 부여된다.
               <br />
               <span style={{ fontSize: 12 }}>(경기 결과를 못 맞춰도 받을 수 있다.)</span>
             </li>
@@ -2976,7 +2976,7 @@ export default function App() {
             <li style={{ marginTop: 10 }}>
               👑 SSR 캐릭터 (수봉킴)
               <br />
-              어떤 SCORE를 선택하든 <b>+1시간 부스팅</b>이 추가된다. 단,못 맞추면 못 받는다.
+              어떤 SCORE를 선택하든 <b>+1시간 부스팅</b>이 추가   단,못 맞추면 못 받는다.
             </li>
 
             <li style={{ marginTop: 10 }}>
