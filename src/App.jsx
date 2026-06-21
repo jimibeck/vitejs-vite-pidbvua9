@@ -2976,7 +2976,7 @@ export default function App() {
             <li style={{ marginTop: 10 }}>
               👑 SSR 캐릭터 (수봉킴)
               <br />
-              어떤 SCORE를 선택하든 <b>+1시간 부스팅</b>이 추가   단,못 맞추면 못 받는다.
+              어떤 SCORE를 선택하든 <b>+1시간 부스팅</b>이 추가됨 단,못 맞추면 못 받는다.
             </li>
 
             <li style={{ marginTop: 10 }}>
