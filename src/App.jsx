@@ -2948,35 +2948,35 @@ export default function App() {
             <li style={{ marginTop: 10 }}>
               확률이 낮은 스코어일수록 시차 ↑
               <br />
-              (최대 7시간 = <b>🏆 센터 시차</b>
+              (최대 7시간 = <b>🏆 하루 연차 효과</b>
               <br />
-              — 세부 사용 기준은 내부 합의에 따름)
+              — 7월 31일 이전에 사용)
             </li>
 
             <li style={{ marginTop: 10 }}>
-              같은 스코어에 2명 이상 적중한다면
+              같은 스코어에 2명 이상 베팅한다면
               <br />
               CENTER BATTLE 클릭게임으로 결판!
               <br />
-              <span style={{ fontSize: 12 }}>1등이 해당 스코어의 시차를 모두 가져갑니다</span>
+              <span style={{ fontSize: 12 }}>1등만 시차를 받는다. 클릭게임 미진행시 최초 베팅자가 받는다.</span>
             </li>
 
             <li style={{ marginTop: 10 }}>
               🌟 슈퍼 연습생 제도
               <br />
-              클릭 미니게임 기록은 시즌 동안 누적됩니다.
+              클릭 미니게임 기록은 시즌 동안 누적된다.
               <br />
               시즌 종료 시 누적 클릭 1위 연습생에게
               <br />
-              <b>👑 SUPER TRAINEE</b> 칭호와 함께 <b>⏰ +1시간 시차</b>가 부여됩니다.
+              <b>👑 SUPER TRAINEE</b> 칭호와 함께 <b>⏰ 1시간 시차</b>가 부여된다.
               <br />
-              <span style={{ fontSize: 12 }}>(경기 결과 적중 여부와 무관)</span>
+              <span style={{ fontSize: 12 }}>(경기 결과를 못 맞춰도 받을 수 있다.)</span>
             </li>
 
             <li style={{ marginTop: 10 }}>
               👑 SSR 캐릭터 (수봉킴)
               <br />
-              어떤 SCORE를 선택하든 <b>+1시간 부스팅</b>이 추가됩니다.
+              어떤 SCORE를 선택하든 <b>+1시간 부스팅</b>이 추가된다. 단,못 맞추면 못 받는다.
             </li>
 
             <li style={{ marginTop: 10 }}>
