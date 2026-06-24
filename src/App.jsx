@@ -697,9 +697,41 @@ export default function App() {
   const [clickGameTimeLeft, setClickGameTimeLeft] = useState(10);
   const [clickGameActive, setClickGameActive] = useState(false);
   const [clickGameCurrentScore, setClickGameCurrentScore] = useState(0);
+  const [clickGameHits, setClickGameHits] = useState(0);
+  const [clickGameBall, setClickGameBall] = useState({ x: 113, y: 83, size: 54 });
 
   const clickGameTimerRef = useRef(null);
+  const clickGameMoveTimerRef = useRef(null);
   const clickGameScoreRef = useRef(0);
+  const clickGameSecurityRef = useRef({
+    startedAt: 0,
+    lastHitAt: 0,
+    suspiciousFastHits: 0,
+    blocked: false,
+  });
+  const [clickGameBlockedReason, setClickGameBlockedReason] = useState("");
+
+  // ───────────────────────────────────────────────
+  // 공 맞추기 미니게임 기준
+  // - 기존 연타형 게임을 정확도 기반 절대평가 게임으로 전환
+  // - 단순 매크로는 움직이는 타겟 좌표를 계속 맞춰야 하므로 불리
+  // ───────────────────────────────────────────────
+  const TARGET_GAME_STORAGE_KEY = "targetgame_scores_v1";
+  const CLICK_GAME_DURATION_SECONDS = 10;
+  const CLICK_GAME_DURATION_MS = CLICK_GAME_DURATION_SECONDS * 1000;
+  const TARGET_GAME_STAGE_WIDTH = 280;
+  const TARGET_GAME_STAGE_HEIGHT = 220;
+  const TARGET_GAME_BALL_SIZE = 54;
+  const TARGET_GAME_MOVE_MS = 650;
+  const TARGET_GAME_MIN_HIT_INTERVAL_MS = 120;
+  const TARGET_GAME_MAX_FAST_HITS = 3;
+  const TARGET_GAME_MAX_SCORE = 300;
+
+  const createRandomBallPosition = () => ({
+    x: Math.round(Math.random() * (TARGET_GAME_STAGE_WIDTH - TARGET_GAME_BALL_SIZE)),
+    y: Math.round(Math.random() * (TARGET_GAME_STAGE_HEIGHT - TARGET_GAME_BALL_SIZE)),
+    size: TARGET_GAME_BALL_SIZE,
+  });
 
   const chatEndRef = useRef(null);
   const chatScrollRef = useRef(null);
@@ -787,7 +819,7 @@ export default function App() {
       } catch {}
 
       try {
-        const cgResult = await dbStorage.get("clickgame_scores");
+        const cgResult = await dbStorage.get(TARGET_GAME_STORAGE_KEY);
         if (cgResult && cgResult.value) setClickGameScores(safeJsonParse(cgResult.value, {}));
       } catch {}
 
@@ -1109,10 +1141,46 @@ export default function App() {
     setDeleteTarget(null);
   };
 
+  const resetClickGameRound = () => {
+    setClickGameCurrentScore(0);
+    setClickGameHits(0);
+    clickGameScoreRef.current = 0;
+    setClickGameBlockedReason("");
+    clickGameSecurityRef.current = {
+      startedAt: 0,
+      lastHitAt: 0,
+      suspiciousFastHits: 0,
+      blocked: false,
+    };
+    setClickGameTimeLeft(CLICK_GAME_DURATION_SECONDS);
+    setClickGameBall(createRandomBallPosition());
+  };
+
+  const stopClickGameTimers = () => {
+    if (clickGameTimerRef.current) clearInterval(clickGameTimerRef.current);
+    if (clickGameMoveTimerRef.current) clearInterval(clickGameMoveTimerRef.current);
+    clickGameTimerRef.current = null;
+    clickGameMoveTimerRef.current = null;
+  };
+
+  const blockClickGameRound = (reason) => {
+    clickGameSecurityRef.current.blocked = true;
+    setClickGameBlockedReason(reason);
+    setClickGameActive(false);
+    setClickGameTimeLeft(0);
+    stopClickGameTimers();
+    clickGameScoreRef.current = 0;
+    setClickGameCurrentScore(0);
+    setClickGameHits(0);
+  };
+
   const saveClickGameScore = async () => {
     if (clickGameOpen === null || !currentUser) return;
+    if (clickGameSecurityRef.current.blocked) return;
 
-    const finalScore = clickGameScoreRef.current;
+    const finalScore = Math.min(clickGameScoreRef.current, TARGET_GAME_MAX_SCORE);
+    if (finalScore <= 0) return;
+
     const key = `${clickGameOpen}_${currentUser.name}`;
     const prevBest = clickGameScores[key] || 0;
     const newBest = Math.max(prevBest, finalScore);
@@ -1121,36 +1189,43 @@ export default function App() {
     setClickGameScores(updated);
 
     try {
-      await dbStorage.set("clickgame_scores", JSON.stringify(updated));
+      await dbStorage.set(TARGET_GAME_STORAGE_KEY, JSON.stringify(updated));
     } catch {}
   };
 
   const startClickGame = (idx) => {
     setClickGameOpen(idx);
     setClickGameActive(false);
-    setClickGameCurrentScore(0);
-    clickGameScoreRef.current = 0;
-    setClickGameTimeLeft(10);
+    resetClickGameRound();
   };
 
   const closeClickGame = () => {
-    if (clickGameTimerRef.current) clearInterval(clickGameTimerRef.current);
+    stopClickGameTimers();
     setClickGameOpen(null);
     setClickGameActive(false);
   };
 
   const beginClickGameRound = () => {
-    if (clickGameTimerRef.current) clearInterval(clickGameTimerRef.current);
+    stopClickGameTimers();
+    resetClickGameRound();
 
-    setClickGameCurrentScore(0);
-    clickGameScoreRef.current = 0;
-    setClickGameTimeLeft(10);
+    clickGameSecurityRef.current = {
+      startedAt: performance.now(),
+      lastHitAt: 0,
+      suspiciousFastHits: 0,
+      blocked: false,
+    };
+    setClickGameTimeLeft(CLICK_GAME_DURATION_SECONDS);
     setClickGameActive(true);
+
+    clickGameMoveTimerRef.current = setInterval(() => {
+      setClickGameBall(createRandomBallPosition());
+    }, TARGET_GAME_MOVE_MS);
 
     clickGameTimerRef.current = setInterval(() => {
       setClickGameTimeLeft((prev) => {
         if (prev <= 1) {
-          clearInterval(clickGameTimerRef.current);
+          stopClickGameTimers();
           setClickGameActive(false);
           setTimeout(saveClickGameScore, 0);
           return 0;
@@ -1160,14 +1235,61 @@ export default function App() {
     }, 1000);
   };
 
-  const handleClickGameTap = () => {
-    if (!clickGameActive) return;
+  const handleClickGameTap = (event) => {
+    if (!clickGameActive || clickGameSecurityRef.current.blocked) return;
 
-    setClickGameCurrentScore((prev) => {
-      const next = prev + 1;
-      clickGameScoreRef.current = next;
-      return next;
-    });
+    // 브라우저가 생성하지 않은 스크립트성 입력은 즉시 차단
+    if (event && event.isTrusted === false) {
+      blockClickGameRound("비정상 입력이 감지되어 기록이 무효 처리되었습니다.");
+      return;
+    }
+
+    const now = performance.now();
+    const security = clickGameSecurityRef.current;
+    const startedAt = security.startedAt || now;
+    const elapsed = now - startedAt;
+
+    if (elapsed > CLICK_GAME_DURATION_MS + 250) {
+      blockClickGameRound("제한 시간 이후 입력이 감지되어 기록이 무효 처리되었습니다.");
+      return;
+    }
+
+    if (security.lastHitAt && now - security.lastHitAt < TARGET_GAME_MIN_HIT_INTERVAL_MS) {
+      security.suspiciousFastHits = (security.suspiciousFastHits || 0) + 1;
+      if (security.suspiciousFastHits >= TARGET_GAME_MAX_FAST_HITS) {
+        blockClickGameRound("비정상적으로 빠른 연속 입력이 감지되어 기록이 무효 처리되었습니다.");
+      }
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const radius = rect.width / 2;
+    const dx = x - radius;
+    const dy = y - radius;
+    const distanceRatio = Math.sqrt(dx * dx + dy * dy) / radius;
+
+    let earnedPoint = 0;
+    if (distanceRatio <= 0.28) earnedPoint = 10;
+    else if (distanceRatio <= 0.62) earnedPoint = 7;
+    else if (distanceRatio <= 1) earnedPoint = 4;
+
+    if (earnedPoint <= 0) return;
+
+    const nextScore = clickGameScoreRef.current + earnedPoint;
+    if (nextScore > TARGET_GAME_MAX_SCORE) {
+      blockClickGameRound("비정상 점수 패턴이 감지되어 기록이 무효 처리되었습니다.");
+      return;
+    }
+
+    security.lastHitAt = now;
+    security.suspiciousFastHits = 0;
+
+    setClickGameCurrentScore(nextScore);
+    setClickGameHits((prev) => prev + 1);
+    clickGameScoreRef.current = nextScore;
+    setClickGameBall(createRandomBallPosition());
   };
 
   const getClickGameWinner = (idx) => {
@@ -1356,17 +1478,39 @@ export default function App() {
           }}
         >
           <div style={{ fontSize: 14, color: palette.gold, fontWeight: 700, marginBottom: 8 }}>
-            🖱️ CENTER BATTLE
+            ⚽ TARGET BATTLE
           </div>
 
           <div style={{ fontSize: 13, color: palette.sub, marginBottom: 16 }}>
-            {s.label} 스코어 동점 연습생들의 센터 쟁탈전
+            {s.label} 스코어 동점 연습생들의 공 맞추기 승부
           </div>
 
-          {!clickGameActive && clickGameTimeLeft === 10 && clickGameCurrentScore === 0 && (
+          {clickGameBlockedReason && (
+            <div
+              style={{
+                fontSize: 12,
+                color: "#FF6B6B",
+                background: "rgba(255,107,107,0.12)",
+                border: "1px solid rgba(255,107,107,0.35)",
+                borderRadius: 10,
+                padding: "10px 12px",
+                marginBottom: 14,
+                lineHeight: 1.45,
+              }}
+            >
+              🚫 {clickGameBlockedReason}
+            </div>
+          )}
+
+          {!clickGameActive && clickGameTimeLeft === CLICK_GAME_DURATION_SECONDS && clickGameCurrentScore === 0 && (
             <>
-              <div style={{ fontSize: 13, color: palette.text, marginBottom: 16 }}>
-                내 최고 기록: <span style={{ color: palette.gold, fontWeight: 700 }}>{myBest}클릭</span>
+              <div style={{ fontSize: 13, color: palette.text, marginBottom: 10 }}>
+                내 최고 기록: <span style={{ color: palette.gold, fontWeight: 700 }}>{myBest}점</span>
+              </div>
+
+              <div style={{ fontSize: 12, color: palette.sub, marginBottom: 16, lineHeight: 1.5 }}>
+                10초 동안 움직이는 공을 정확히 맞히세요.<br />
+                중앙 10점 · 안쪽 7점 · 외곽 4점
               </div>
 
               <button
@@ -1384,7 +1528,7 @@ export default function App() {
                   marginBottom: 10,
                 }}
               >
-                ⚡ CENTER BATTLE 시작
+                ⚽ 공 맞추기 시작
               </button>
 
               <button
@@ -1408,33 +1552,73 @@ export default function App() {
 
           {clickGameActive && (
             <>
-              <div style={{ fontSize: 28, fontWeight: 900, color: palette.gold, marginBottom: 8 }}>
-                ⏱️ {clickGameTimeLeft}초
-              </div>
-
-              <div style={{ fontSize: 16, color: palette.text, marginBottom: 16 }}>
-                현재 클릭: <span style={{ color: palette.accent, fontWeight: 900, fontSize: 22 }}>{clickGameCurrentScore}</span>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
+                <div style={{ background: "#0E1A2B", borderRadius: 10, padding: "8px 6px" }}>
+                  <div style={{ fontSize: 11, color: palette.sub }}>남은 시간</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: palette.gold }}>{clickGameTimeLeft}초</div>
+                </div>
+                <div style={{ background: "#0E1A2B", borderRadius: 10, padding: "8px 6px" }}>
+                  <div style={{ fontSize: 11, color: palette.sub }}>현재 점수</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: palette.accent }}>{clickGameCurrentScore}</div>
+                </div>
+                <div style={{ background: "#0E1A2B", borderRadius: 10, padding: "8px 6px" }}>
+                  <div style={{ fontSize: 11, color: palette.sub }}>적중</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: palette.text }}>{clickGameHits}회</div>
+                </div>
               </div>
 
               <div
-                onClick={handleClickGameTap}
                 style={{
-                  width: 160,
-                  height: 160,
-                  margin: "0 auto 16px",
-                  borderRadius: "50%",
-                  border: `4px solid ${palette.gold}`,
-                  cursor: "pointer",
+                  position: "relative",
+                  width: "100%",
+                  maxWidth: TARGET_GAME_STAGE_WIDTH,
+                  height: TARGET_GAME_STAGE_HEIGHT,
+                  margin: "0 auto 12px",
+                  borderRadius: 18,
                   overflow: "hidden",
+                  background: "linear-gradient(180deg, #0B2A3F 0%, #0E3B2E 100%)",
+                  border: `2px solid ${palette.gold}`,
+                  boxShadow: `0 0 24px rgba(255,200,87,0.28)`,
                   userSelect: "none",
-                  boxShadow: `0 0 24px rgba(255,200,87,0.4)`,
+                  touchAction: "manipulation",
                 }}
               >
-                <Avatar src={currentUser.img} size={160} />
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 12,
+                    border: "1px dashed rgba(255,255,255,0.18)",
+                    borderRadius: 14,
+                    pointerEvents: "none",
+                  }}
+                />
+
+                <div
+                  onClick={handleClickGameTap}
+                  style={{
+                    position: "absolute",
+                    left: clickGameBall.x,
+                    top: clickGameBall.y,
+                    width: clickGameBall.size,
+                    height: clickGameBall.size,
+                    borderRadius: "50%",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 31,
+                    background: "radial-gradient(circle, rgba(255,255,255,1) 0 25%, rgba(255,200,87,0.95) 26% 55%, rgba(255,255,255,0.9) 56% 100%)",
+                    border: `3px solid ${palette.gold}`,
+                    boxShadow: "0 8px 18px rgba(0,0,0,0.35)",
+                    transition: "left 0.16s ease-out, top 0.16s ease-out, transform 0.08s ease-out",
+                  }}
+                >
+                  ⚽
+                </div>
               </div>
 
-              <div style={{ fontSize: 12, color: palette.sub }}>
-                10초 동안 가장 빠른 손을 증명해주세요
+              <div style={{ fontSize: 12, color: palette.sub, lineHeight: 1.45 }}>
+                빈 공간을 눌러도 점수는 없습니다. 움직이는 공을 정확히 맞히는 게임입니다.
               </div>
             </>
           )}
@@ -1442,19 +1626,15 @@ export default function App() {
           {!clickGameActive && clickGameTimeLeft === 0 && (
             <>
               <div style={{ fontSize: 16, color: palette.gold, fontWeight: 700, marginBottom: 8 }}>
-                결과: {clickGameCurrentScore}클릭!
+                {clickGameBlockedReason ? "기록 무효 처리" : `결과: ${clickGameCurrentScore}점 / 적중 ${clickGameHits}회`}
               </div>
 
               <div style={{ fontSize: 13, color: palette.sub, marginBottom: 16 }}>
-                내 최고 기록: <span style={{ color: palette.gold, fontWeight: 700 }}>{Math.max(myBest, clickGameCurrentScore)}클릭</span>
+                내 최고 기록: <span style={{ color: palette.gold, fontWeight: 700 }}>{myBest}점</span>
               </div>
 
               <button
-                onClick={() => {
-                  setClickGameTimeLeft(10);
-                  setClickGameCurrentScore(0);
-                  clickGameScoreRef.current = 0;
-                }}
+                onClick={resetClickGameRound}
                 style={{
                   width: "100%",
                   padding: "12px",
@@ -1468,7 +1648,7 @@ export default function App() {
                   marginBottom: 10,
                 }}
               >
-                다시 도전하기 ⚡
+                다시 도전하기 ⚽
               </button>
 
               <button
@@ -2535,7 +2715,7 @@ export default function App() {
                           boxSizing: "border-box",
                         }}
                       >
-                        {row.isClickGameWinner ? "🖱️🏆" : "🖱️"}
+                        {row.isClickGameWinner ? "⚽🏆" : "⚽"}
                       </span>
                     )}
                   </div>
@@ -2592,7 +2772,7 @@ export default function App() {
                       )}
                       {row.isClickGameTie && (
                         <span style={{ fontSize: 11, marginLeft: row.ssrBonus > 0 ? 6 : 0, color: row.isClickGameWinner ? palette.gold : palette.sub }}>
-                          {row.isClickGameWinner ? "클릭 미니게임 승리" : "클릭 미니게임 참여"}
+                          {row.isClickGameWinner ? "공 맞추기 승리" : "공 맞추기 참여"}
                         </span>
                       )}
                     </div>
@@ -2619,7 +2799,7 @@ export default function App() {
           <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
             {speedRanking.length === 0 ? (
               <div style={{ color: palette.sub, fontSize: 13, textAlign: "center", padding: "14px 0", lineHeight: 1.6 }}>
-                아직 클릭 기록이 없습니다.
+                아직 공 맞추기 기록이 없습니다.
               </div>
             ) : (
               speedRanking.map((row, i) => (
@@ -2649,7 +2829,7 @@ export default function App() {
                   </div>
 
                   <div style={{ textAlign: "right", color: i === 0 ? palette.gold : palette.sub, fontWeight: 700, flexShrink: 0 }}>
-                    {row.score}클릭
+                    {row.score}점
                     {i === 0 && <div style={{ fontSize: 10, color: palette.gold }}>⏰ +1시간 시차</div>}
                   </div>
                 </div>
@@ -2805,7 +2985,7 @@ export default function App() {
 
                               {myScore != null && (
                                 <span style={{ fontSize: 11, color: palette.gold, flexShrink: 0 }}>
-                                  🖱️{myScore}
+                                  ⚽{myScore}점
                                 </span>
                               )}
 
@@ -2849,13 +3029,13 @@ export default function App() {
 
                           return ranking.length > 0 ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: palette.sub, marginBottom: 8 }}>
-                              <div style={{ color: palette.gold, fontWeight: 700 }}>🖱️ 센터 쟁탈전 TOP3</div>
+                              <div style={{ color: palette.gold, fontWeight: 700 }}>⚽ 공 맞추기 TOP3</div>
                               {ranking.map((r, rankIdx) => (
                                 <div key={r.name}>
                                   <span style={{ color: rankIdx === 0 ? palette.gold : palette.sub, fontWeight: 700 }}>
                                     {labels[rankIdx]}
                                   </span>{" "}
-                                  {r.name} {r.score}클릭
+                                  {r.name} {r.score}점
                                 </div>
                               ))}
                             </div>
@@ -2883,7 +3063,7 @@ export default function App() {
                               cursor: "pointer",
                             }}
                           >
-                            CENTER BATTLE 도전 🖱️
+                            CENTER BATTLE 도전 ⚽
                           </button>
                         )}
                       </div>
@@ -2948,35 +3128,35 @@ export default function App() {
             <li style={{ marginTop: 10 }}>
               확률이 낮은 스코어일수록 시차 ↑
               <br />
-              (최대 7시간 = <b>🏆 하루 연차 효과</b>
+              (최대 7시간 = <b>🏆 센터 시차</b>
               <br />
-              — 7월 31일 이전에 사용)
+              — 세부 사용 기준은 내부 합의에 따름)
             </li>
 
             <li style={{ marginTop: 10 }}>
-              같은 스코어에 2명 이상 베팅한다면
+              같은 스코어에 2명 이상 적중한다면
               <br />
-              CENTER BATTLE 클릭게임으로 결판!
+              CENTER BATTLE 공 맞추기 게임으로 결판!
               <br />
-              <span style={{ fontSize: 12 }}>1등만 시차 받는다. 클릭게임 안하면 최초 베팅자 수령.</span>
+              <span style={{ fontSize: 12 }}>1등이 해당 스코어의 시차를 모두 가져갑니다</span>
             </li>
 
             <li style={{ marginTop: 10 }}>
               🌟 슈퍼 연습생 제도
               <br />
-              클릭 미니게임 기록은 시즌 동안 누적된다.
+              공 맞추기 미니게임 기록은 시즌 동안 누적됩니다.
               <br />
-              시즌 종료 시 누적 클릭 1위 연습생에게
+              시즌 종료 시 누적 점수 1위 연습생에게
               <br />
-              <b>👑 SUPER TRAINEE</b> 칭호와 함께 <b>⏰ 1시간 시차</b> 부여된다.
+              <b>👑 SUPER TRAINEE</b> 칭호와 함께 <b>⏰ +1시간 시차</b>가 부여됩니다.
               <br />
-              <span style={{ fontSize: 12 }}>(경기 결과를 못 맞춰도 받을 수 있다.)</span>
+              <span style={{ fontSize: 12 }}>(경기 결과 적중 여부와 무관)</span>
             </li>
 
             <li style={{ marginTop: 10 }}>
               👑 SSR 캐릭터 (수봉킴)
               <br />
-              어떤 SCORE를 선택하든 <b>+1시간 부스팅</b>이 추가됨 단,못 맞추면 못 받는다.
+              어떤 SCORE를 선택하든 <b>+1시간 부스팅</b>이 추가됩니다.
             </li>
 
             <li style={{ marginTop: 10 }}>
