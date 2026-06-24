@@ -1013,7 +1013,7 @@ export default function App() {
   const handleSubmit = async () => {
     if (!currentUser) return;
 
-    if (isBettingClosed()) {
+    if (isBettingClosed() && currentUser.name !== MASTER_NAME) {
       setError("🎬 FINAL STAGE가 시작되었습니다. 이제 무대만 남았습니다!");
       return;
     }
@@ -1112,7 +1112,7 @@ export default function App() {
   };
 
   const removeEntry = (scoreIdx, name) => {
-    if (isBettingClosed()) return;
+    if (isBettingClosed() && currentUser?.name !== MASTER_NAME) return;
 
     const updated = { ...members };
     updated[scoreIdx] = updated[scoreIdx].filter((e) => e.name !== name);
@@ -2838,7 +2838,27 @@ export default function App() {
           </div>
         </div>
 
-        {currentUser.name === MASTER_NAME ? (
+        {currentUser.name === MASTER_NAME && (
+          <div
+            style={{
+              marginTop: 16,
+              marginBottom: 12,
+              padding: "14px",
+              borderRadius: 10,
+              textAlign: "center",
+              background: "#0E1A2B",
+              border: `1px solid ${palette.gold}`,
+              color: palette.gold,
+              fontWeight: 800,
+              fontSize: 14,
+              lineHeight: 1.5,
+            }}
+          >
+            🧪 TEDDY 테스트 모드 — 단장도 스코어 선택·베팅 저장·CENTER BATTLE 테스트가 가능합니다
+          </div>
+        )}
+
+        {false && currentUser.name === MASTER_NAME ? (
           <div
             style={{
               marginTop: 16,
@@ -2857,7 +2877,7 @@ export default function App() {
           </div>
         ) : (
           <>
-            {isBettingClosed() ? (
+            {isBettingClosed() && currentUser.name !== MASTER_NAME ? (
               <div
                 style={{
                   marginTop: 16,
@@ -2911,7 +2931,7 @@ export default function App() {
               {SCORES.map((s, idx) => {
                 const entries = members[idx] || [];
                 const isSelected = selected === idx;
-                const locked = isBettingClosed();
+                const locked = isBettingClosed() && currentUser.name !== MASTER_NAME;
 
                 return (
                   <div
@@ -3006,7 +3026,7 @@ export default function App() {
                       </div>
                     )}
 
-                    {entries.length >= 2 && (
+                    {(entries.length >= 2 || (currentUser.name === MASTER_NAME && entries.some((e) => e.name === currentUser.name))) && (
                       <div
                         style={{
                           marginTop: 10,
